@@ -255,7 +255,7 @@ tr.pend td{background:#3a1f1a}
    Bez config.js stránka běží v DEMO režimu s ukázkovými daty v paměti. */
 var API_URL = (window.GARAGE_API || '').trim();
 if (!/^https:\/\/script\.google\.com\//.test(API_URL)) API_URL = ''; // nevyplněný config.js = demo
-var APP_VERSION = '20261025-100516'; // vyplní se samo při sestavení – podle toho se pozná nová verze
+var APP_VERSION = '20261025-201605'; // vyplní se samo při sestavení – podle toho se pozná nová verze
 /* ================================================ */
 </script>
 <script>
@@ -2729,7 +2729,7 @@ var CORE = (function () {
   }
 
   function itemsOut(db, all) {
-    return db.items.filter(function (i) { return all || act(i); })
+    return db.items.filter(function (i) { return !+i.smazano && (all || act(i)); })
       .sort(function (a, b) { return (+a.poradi || 0) - (+b.poradi || 0); })
       .map(function (i) { return { id: i.id, nazev: i.nazev, cena: +i.cena, zasobaId: i.zasobaId || '', spotreba: +i.spotreba || 0, aktivni: act(i), poradi: +i.poradi || 0 }; });
   }
@@ -2897,11 +2897,23 @@ var CORE = (function () {
     var st = stockById(db, p.id); if (!st || +st.smazano) err('Zásoba nenalezena.');
     // měkké smazání: z nabídky zmizí, historie pohybů si název ponechá
     st.smazano = 1; st.aktivni = 0; op(db, 'update', 'stocks', st);
-    var odpojeno = [];
+    var odpojeno = [], smazano = [];
     db.items.forEach(function (it) {
-      if (it.zasobaId === st.id) { it.zasobaId = ''; it.spotreba = 0; op(db, 'update', 'items', it); odpojeno.push(it.nazev); }
+      if (it.zasobaId !== st.id || +it.smazano) return;
+      if (p.sPolozkami) { it.smazano = 1; it.aktivni = 0; smazano.push(it.nazev); }   // smazat i položky, které z ní prodávají
+      else { it.zasobaId = ''; it.spotreba = 0; odpojeno.push(it.nazev); }
+      op(db, 'update', 'items', it);
     });
-    return { ok: true, odpojeno: odpojeno };
+    return { ok: true, odpojeno: odpojeno, smazano: smazano };
+  }
+
+  function deleteItem(db, a, p) {
+    needAdmin(db, a);
+    var it = itemById(db, p.id); if (!it || +it.smazano) err('Položka nenalezena.');
+    // měkké smazání: zmizí z nabídky i ze Správce, historie pohybů si název ponechá
+    it.smazano = 1; it.aktivni = 0; op(db, 'update', 'items', it);
+    var st = stockById(db, it.zasobaId), dalsi = st && db.items.some(function (x) { return x.zasobaId === st.id && !+x.smazano; });
+    return { ok: true, zasoba: st && !dalsi ? { id: st.id, nazev: st.nazev } : null };
   }
 
   function saveItem(db, a, p) {
@@ -2970,7 +2982,7 @@ var CORE = (function () {
     return { ok: true };
   }
 
-  var API = { state: state, checkPin: checkPin, add: add, checkin: checkin, checkout: checkout, setOpen: setOpen, setFav: setFav, undo: undo, pay: pay, stock: stock, saveStock: saveStock, deleteStock: deleteStock, saveItem: saveItem, saveMember: saveMember, saveSettings: saveSettings };
+  var API = { state: state, checkPin: checkPin, add: add, checkin: checkin, checkout: checkout, setOpen: setOpen, setFav: setFav, undo: undo, pay: pay, stock: stock, saveStock: saveStock, deleteStock: deleteStock, deleteItem: deleteItem, saveItem: saveItem, saveMember: saveMember, saveSettings: saveSettings };
   function run(db, action, auth, payload) {
     if (!API[action]) err('Neznámá akce.');
     return API[action](db, auth, payload || {});
@@ -3768,8 +3780,8 @@ var CORE = (function () {
       if (x === 'del') {
         var linked = ST.items.filter(function (i) { return i.zasobaId === z.id; }).map(function (i) { return esc(i.nazev); });
         h += '<div class="adm-panel confirm" style="background:var(--bg);flex-direction:row;margin-top:12px"><div><div class="eyebrow bad">Opravdu smazat zásobu „' + esc(z.nazev) + '“?</div>' +
-          '<div class="muted" style="font-size:.85rem;margin-top:4px">' + (linked.length ? 'Položky ' + linked.join(', ') + ' přestanou odepisovat ze skladu (v nabídce zůstanou). ' : '') +
-          'Historie pohybů zůstane zachovaná.</div></div>' +
+          (linked.length ? '<label class="row" style="margin-top:8px"><input id="z_withitems" type="checkbox" checked> Smazat i položky: ' + linked.join(', ') + '</label>' : '') +
+          '<div class="muted" style="font-size:.85rem;margin-top:4px">' + (linked.length ? 'Když odškrtneš, položky v nabídce zůstanou, jen přestanou odepisovat ze skladu. ' : '') + 'Historie pohybů zůstane zachovaná.</div></div>' +
           '<div class="row"><button class="btn primary" id="z_ok">Ano, smazat</button><button class="btn" id="z_no">Ne</button></div></div>';
       }
       if (x === 'edit') h += '<div class="adm-panel"><div class="grid2">' +
@@ -3859,7 +3871,12 @@ var CORE = (function () {
         api('stock', mn ? { zasobaId: z.id, mnozstvi: mn } : { zasobaId: z.id, baleni: ($('#z_bal') || {}).value, velikost: ($('#z_size') || {}).value }).then(done('Naskladněno')).catch(fail);
       }
       if (x === 'inv') api('stock', { zasobaId: z.id, inventura: true, stav: $('#z_inv').value }).then(done('Stav uložen')).catch(fail);
-      if (x === 'del') { ok.disabled = true; api('deleteStock', { id: z.id }).then(done('Zásoba „' + z.nazev + '“ smazána')).catch(function (e) { ok.disabled = false; fail(e); }); }
+      if (x === 'del') {
+        ok.disabled = true; var wi = $('#z_withitems');
+        api('deleteStock', { id: z.id, sPolozkami: wi ? wi.checked : false }).then(function (r) {
+          toast('Zásoba „' + z.nazev + '“ smazána' + (r.smazano && r.smazano.length ? ' i s položkami ' + r.smazano.join(', ') : '')); EXP = {}; document.activeElement.blur(); return reAdm();
+        }).catch(function (e) { ok.disabled = false; fail(e); });
+      }
       if (x === 'edit') api('saveStock', { id: z.id, nazev: $('#z_n').value, jednotka: $('#z_j').value, baleni: $('#z_b').value, obal: $('#z_o').value, nizko: $('#z_lo').value, aktivni: $('#z_a').checked }).then(done('Uloženo')).catch(fail);
     };
   }
@@ -3878,7 +3895,12 @@ var CORE = (function () {
         return '<div class="adm-item"><div class="adm-head"><div class="main"><div style="font-weight:600;font-size:1.1rem">' + esc(i.nazev) + (i.aktivni ? '' : ' <span class="chip">skrytá</span>') + '</div>' +
           '<div class="muted" style="font-size:.85rem">' + (z ? 'ubere ' + fmtQ(i.spotreba, z.jednotka) + ' z „' + esc(z.nazev) + '“' : 'bez skladu') + '</div></div>' +
           '<div class="bal num" style="font-size:1.4rem">' + kc(i.cena) + '</div></div>' +
-          '<div class="row" style="margin-top:10px"><button class="btn small' + (x === 'edit' ? ' primary' : '') + '" data-ix="edit" data-id="' + i.id + '">Upravit</button></div>' +
+          '<div class="row" style="margin-top:10px"><button class="btn small' + (x === 'edit' ? ' primary' : '') + '" data-ix="edit" data-id="' + i.id + '">Upravit</button>' +
+          '<button class="btn small' + (x === 'del' ? ' primary' : '') + '" data-ix="del" data-id="' + i.id + '">Smazat</button></div>' +
+          (x === 'del' ? '<div class="adm-panel confirm" style="background:var(--bg);flex-direction:row;margin-top:12px"><div><div class="eyebrow bad">Opravdu smazat položku „' + esc(i.nazev) + '“?</div>' +
+            '<div class="muted" style="font-size:.85rem;margin-top:4px">Zmizí z tabletu i mobilů. Historie pohybů a zůstatky lidí zůstanou.' +
+            (z && ST.items.filter(function (q) { return q.zasobaId === z.id && q.id !== i.id; }).length === 0 ? ' Zásobu „' + esc(z.nazev) + '“ pak můžeš smazat ve Skladu.' : '') + '</div></div>' +
+            '<div class="row"><button class="btn primary" id="i_del">Ano, smazat</button><button class="btn" id="i_no">Ne</button></div></div>' : '') +
           (x === 'edit' ? '<div class="adm-panel"><div class="grid2"><div class="field"><label for="i_n">Název</label><input id="i_n" type="text" value="' + esc(i.nazev) + '"></div>' +
             '<div class="field"><label for="i_c">Cena Kč</label><input id="i_c" type="text" inputmode="decimal" value="' + fmtNum(i.cena) + '"></div>' +
             '<div class="field"><label for="i_z">Bere ze zásoby</label><select id="i_z">' + zOpts(i.zasobaId) + '</select></div>' +
@@ -3905,6 +3927,12 @@ var CORE = (function () {
       b.onclick = function () { var id = b.dataset.id, x = b.dataset.ix; EXP = EXP[id] === x ? {} : (function () { var o = {}; o[id] = x; return o; })(); renderAdmin(); };
     });
     var open = ST.items.filter(function (i) { return EXP[i.id]; })[0];
+    var idel = $('#i_del'), ino = $('#i_no');
+    if (ino) ino.onclick = function () { EXP = {}; renderAdmin(); };
+    if (open && idel) idel.onclick = function () {
+      idel.disabled = true;
+      api('deleteItem', { id: open.id }).then(function () { toast('Položka „' + open.nazev + '“ smazána'); EXP = {}; return reAdm(); }).catch(function (e) { idel.disabled = false; fail(e); });
+    };
     if (open && $('#i_ok')) $('#i_ok').onclick = function () {
       api('saveItem', { id: open.id, nazev: $('#i_n').value, cena: num($('#i_c').value), zasobaId: $('#i_z').value, spotreba: $('#i_sp').value, poradi: $('#i_p').value, aktivni: $('#i_a').checked })
         .then(function () { toast('Uloženo'); EXP = {}; document.activeElement.blur(); return reAdm(); }).catch(fail);

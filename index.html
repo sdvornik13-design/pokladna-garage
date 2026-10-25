@@ -1,0 +1,4138 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16130f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Pokladna Garage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Klubový pult: tmavé dřevo, pivní jantar jako jediný akcent, velké dlaždice na ťukání palcem */
+:root{
+  --bg:#16130f; --panel:#221e18; --panel2:#2b261f; --line:#3d362c;
+  --fg:#f4ede1; --muted:#a89c89; --amber:#eaa733; --amber-ink:#1d1406;
+  --good:#71c48f; --bad:#f07261; --warn:#e9c45a;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font:16px/1.4 var(--body);min-height:100vh;-webkit-tap-highlight-color:transparent;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto}
+.narrow{max-width:560px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h2{font-size:1.5rem}
+.eyebrow{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+.good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 12px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.top h1{font-size:1.6rem}
+.clock{font-family:var(--display);font-size:1.6rem;color:var(--muted)}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 14px;font-weight:600}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--amber);color:var(--amber-ink);border-color:var(--amber)}
+.btn.ghost{background:transparent}
+.btn.small{padding:6px 10px;font-size:.9rem}
+.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:.8rem;color:var(--muted)}
+input[type=text],input[type=number],input[type=password],select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;width:100%}
+input:focus{border-color:var(--amber);outline:none}
+
+/* balance */
+.bal{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums}
+.bal-label{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+
+/* item tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-height:110px;padding:14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);text-align:left;transition:transform .08s,background .15s}
+.tile:active{transform:scale(.97);background:var(--panel2)}
+.tile .n{font-family:var(--display);font-size:1.45rem;font-weight:600;line-height:1.05}
+.tile .p{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:600}
+.tile .ft{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.tile .s{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.tile .s.low{color:var(--warn)}
+.tile.has .n{padding-right:34px}
+.tile.big{width:100%;min-height:130px;margin-bottom:10px;padding:18px 20px;border-color:#6b5426;background:linear-gradient(135deg,#3a2c12,var(--panel) 70%)}
+.tile.big .n{font-size:2.3rem;line-height:1}
+.tile.big .p{font-size:1.15rem}
+.tile.big .cnt{min-width:40px;height:40px;border-radius:20px;font-size:1.15rem;right:14px;top:14px}
+.tile.big .eyebrow{color:var(--amber)}
+.favpick{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted)}
+.favpick select{width:auto;padding:6px 10px;font-size:.85rem}
+.tile .cnt{position:absolute;right:8px;top:8px;min-width:30px;height:30px;padding:0 8px;border-radius:15px;background:var(--amber);color:var(--amber-ink);
+  font-weight:700;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.tile.pulse{animation:pulse .35s ease}
+@keyframes pulse{50%{background:#3a2f17;border-color:var(--amber)}}
+
+/* sections */
+.sec{margin-top:22px}
+.sec>h2,.sec>.sechead{margin-bottom:10px}
+.sechead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.list{display:flex;flex-direction:column}
+.li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.li:last-child{border-bottom:0}
+.li .main{min-width:0}
+.li .sub{font-size:.82rem;color:var(--muted)}
+.li.storno .main,.li.storno .amt{text-decoration:line-through;opacity:.5}
+.amt{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.pendlab{font-size:.78rem;font-weight:700;color:var(--warn);border:1px dashed var(--warn);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.netbar{margin-top:12px;padding:10px 14px;border-radius:10px;background:#2c2614;border:1px solid #6a5a22;color:var(--warn);display:flex;gap:8px;flex-wrap:wrap}
+.netbar.down{background:#33191a;border-color:var(--bad);color:#f6c2bb}
+.stlab{font-size:.78rem;font-weight:700;color:var(--bad);border:1px solid var(--bad);border-radius:999px;padding:2px 8px;white-space:nowrap}
+
+/* member hero */
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:20px 0 16px;flex-wrap:wrap}
+.hero h1{font-size:2.4rem;line-height:1}
+.hero .bal{font-size:2.6rem;line-height:1}
+.hero .balbox{text-align:right}
+.pinme{margin-top:8px;font-size:.85rem;color:var(--muted)}
+.pinme b{color:var(--fg);font-size:1rem;letter-spacing:.2em;margin-left:4px}
+
+/* tablet member grid */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.mcard{display:flex;flex-direction:column;gap:8px;padding:14px;min-height:120px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);text-align:left}
+.mcard .nm{font-family:var(--display);font-size:1.5rem;font-weight:600;line-height:1}
+.mcard .bal{font-size:1.4rem}
+.mcard .today{font-size:.82rem;color:var(--muted);margin-top:auto}
+.mcard.active{border-color:#6b5426;background:linear-gradient(180deg,#2c2416,var(--panel))}
+.mcard.host{border-style:dashed}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;background:var(--panel2);border:1px solid var(--line)}
+.pres{margin:0 0 16px;padding:14px 16px}
+.sndbtn{display:inline-flex;align-items:center;justify-content:center;padding:6px 8px;line-height:0}
+.eyebrow .sndbtn{padding:2px 6px;border:0;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pres.open{border-color:#2f5a3c;background:linear-gradient(180deg,#1d2a1f,var(--panel))}
+.pres-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pres-st{display:flex;align-items:center;gap:12px}
+.pres-t{font-family:var(--display);font-size:1.5rem;font-weight:700;line-height:1}
+.live{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;display:inline-block}
+.live.on{background:var(--good);box-shadow:0 0 0 0 rgba(113,196,143,.6);animation:live 2s infinite}
+.live.sm{width:9px;height:9px;margin-left:8px;vertical-align:middle}
+@keyframes live{70%{box-shadow:0 0 0 8px rgba(113,196,143,0)}100%{box-shadow:0 0 0 0 rgba(113,196,143,0)}}
+.pres-who{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.who{padding:6px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-weight:600;font-size:.92rem}
+.who.me{border-color:var(--good)}
+.herechip{font-size:.78rem;font-weight:600;color:var(--good)}
+.sheet .bar h2{margin-right:auto}
+.sheet .bar{justify-content:flex-start;flex-wrap:wrap}
+tr.garow td{background:rgba(113,196,143,.06)}
+.lowbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.lowbar .chip{border-color:#6a5a22;color:var(--warn)}
+
+/* overlay sheet */
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow-y:auto;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet .bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.sheet .bar h2{font-size:2rem}
+
+/* PIN pad */
+.pin{max-width:320px;margin:20px auto;text-align:center}
+.dots{display:flex;justify-content:center;gap:14px;margin:18px 0 22px}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--muted)}
+.dot.on{background:var(--amber);border-color:var(--amber)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{height:68px;border-radius:14px;border:1px solid var(--line);background:var(--panel);font-family:var(--display);font-size:1.8rem;font-weight:600}
+.pad button:active{background:var(--panel2)}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+
+/* QR */
+.qrbox{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.qr{background:#fff;border-radius:10px;padding:8px;width:180px;height:180px;flex:none}
+.qr svg{width:100%;height:100%;display:block}
+.qrinfo{min-width:0;flex:1 1 200px;display:flex;flex-direction:column;gap:6px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88rem;word-break:break-all}
+
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tab.on{color:var(--fg);border-bottom-color:var(--amber)}
+.adm-item{border-bottom:1px solid var(--line);padding:12px 0}
+.adm-item:last-child{border-bottom:0}
+.adm-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.adm-panel{margin-top:12px;padding:12px;background:var(--bg);border-radius:10px;display:flex;flex-direction:column;gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stats{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px}
+.note{font-size:.82rem;color:var(--muted);margin:0 0 8px}
+.info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--muted);font:600 .7rem/1 var(--body);letter-spacing:0;text-transform:none;cursor:help;vertical-align:1px;margin-left:4px;position:relative}
+.info:hover::after,.info:focus::after{content:attr(title);position:absolute;left:0;top:22px;z-index:30;width:240px;padding:10px 12px;border-radius:10px;background:var(--fg);color:var(--bg);font:500 .82rem/1.35 var(--body);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.stats .bal{font-size:1.6rem}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
+tr.storno td{opacity:.45;text-decoration:line-through}
+tr.storno td:nth-last-child(-n+2){text-decoration:none;opacity:1}
+tr.pend td{background:#3a1f1a}
+.addgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.addgrid .btn{text-align:left;padding:12px}
+.sellrows{display:flex;flex-direction:column;gap:8px}
+.sellrow{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.sellrow:has(> :nth-child(2):last-child){grid-template-columns:2fr 1fr}
+@media (max-width:520px){.sellrow{grid-template-columns:1fr 1fr}.sellrow > :first-child{grid-column:1/-1}}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.confirm{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;border-color:var(--bad)}
+
+/* toast + demo */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:40;
+  display:flex;align-items:center;gap:14px;padding:12px 14px 12px 18px;border-radius:12px;background:var(--fg);color:var(--bg);font-weight:600;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100% - 32px)}
+.toast button{background:var(--bg);color:var(--fg);border:0;border-radius:8px;padding:8px 12px;font-weight:700}
+.toast.err{background:var(--bad);color:#1f0a07}
+.demo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin-top:12px;border:1px dashed #6a5a22;border-radius:10px;font-size:.9rem}
+.demo b{color:var(--warn)}
+.empty{padding:18px 0;color:var(--muted)}
+.loading{padding:60px 0;text-align:center;color:var(--muted)}
+@media (max-width:520px){
+  .hero h1{font-size:2rem} .hero .bal{font-size:2.1rem}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .tile{min-height:96px} .tile .n{font-size:1.25rem}
+  .mgrid{grid-template-columns:repeat(2,1fr)}
+}
+/* tisk na účtenkovou tiskárnu 80 mm (tiskne se jen #printarea) */
+#printarea{display:none}
+@media print{
+  @page{margin:0}
+  html,body{background:#fff!important;color:#000!important;padding:0!important;margin:0!important}
+  body>*:not(#printarea){display:none!important}
+  #printarea{display:block!important;width:72mm;margin:0 auto;padding:2mm 0 6mm;font:13px/1.35 "Courier New",Courier,monospace;color:#000}
+}
+.bon{color:#000;font:13px/1.35 "Courier New",Courier,monospace}
+.bon .bh{text-align:center;font-weight:700;font-size:16px;border-top:2px dashed #000;border-bottom:2px dashed #000;padding:3px 0;margin-bottom:4px}
+.bon .big{font-size:20px;font-weight:700;margin:6px 0}
+.bon .row2{display:flex;justify-content:space-between;gap:6px}
+.bon .sep{border-top:1px dashed #000;margin:5px 0}
+.bon .ctr{text-align:center}
+.bon.storno .bh{background:#000;color:#fff}
+.bon .bonqr{width:46mm;max-width:80%;margin:6px auto}
+.bon .bonqr svg{width:100%;height:auto;display:block}
+.qrfull{position:fixed;inset:0;z-index:50;background:rgba(10,8,6,.85);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.qrfull-in{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;max-width:440px;width:100%}
+.qrfull-in h2{font-size:2.2rem}
+.qrbigbox{background:#fff;border-radius:12px;padding:12px;width:min(340px,70vw)}
+.qrbigbox svg{width:100%;height:auto;display:block}
+#paper{position:fixed;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:35;width:250px;max-height:42vh;overflow:auto;background:#f6f3ec;border-radius:6px;box-shadow:0 12px 30px rgba(0,0,0,.5);padding:10px 12px}
+#paper .ph{display:flex;justify-content:space-between;align-items:center;font:600 .78rem/1 var(--body);color:#555;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+#paper .ph button{border:0;background:#ddd;border-radius:6px;padding:4px 8px;font-weight:700;color:#222}
+#paper .bon{padding:8px 0;border-bottom:1px dotted #999}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="demo" hidden></div>
+<div id="net" hidden></div>
+<main id="app"><div class="loading">Načítám…</div></main>
+<div id="sheet" class="sheet" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<div id="printarea" aria-hidden="true"></div>
+<div id="paper" hidden></div>
+
+<script src="config.js"></script>
+<script>
+/* ================== NASTAVENÍ ==================
+   Adresa serveru (Apps Script, končí /exec) se bere ze souboru config.js vedle index.html:
+     window.GARAGE_API = 'https://script.google.com/macros/s/…/exec';
+   Bez config.js stránka běží v DEMO režimu s ukázkovými daty v paměti. */
+var API_URL = (window.GARAGE_API || '').trim();
+if (!/^https:\/\/script\.google\.com\//.test(API_URL)) API_URL = ''; // nevyplněný config.js = demo
+var APP_VERSION = '20261025-100516'; // vyplní se samo při sestavení – podle toho se pozná nová verze
+/* ================================================ */
+</script>
+<script>
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+</script>
+<script>
+/* ===== POKLADNA – společná logika (běží v Apps Scriptu i v demo režimu prohlížeče) ===== */
+var CORE = (function () {
+  var UNDO_MS = 2 * 60 * 1000; // storno vlastního zápisu do 2 minut
+
+  function err(msg) { var e = new Error(msg); e.user = true; throw e; }
+  function rnd(n, chars) { var s = ''; for (var i = 0; i < n; i++) s += chars.charAt(Math.floor(Math.random() * chars.length)); return s; }
+  function newToken() { return rnd(10, 'abcdefghijkmnpqrstuvwxyz23456789'); }
+  function newId(p) { return p + Date.now().toString(36) + rnd(4, 'abcdefghijkmnpqrstuvwxyz23456789'); }
+  function r2(x) { return Math.round(x * 100) / 100; }
+  function r3(x) { return Math.round(x * 1000) / 1000; }
+  function num(x) { return parseFloat(String(x == null ? '' : x).replace(',', '.')); }
+  function act(x) { return x.aktivni === 1 || x.aktivni === true || x.aktivni === '1'; }
+  function op(db, kind, table, row) { (db._ops = db._ops || []).push({ kind: kind, table: table, row: row }); }
+
+  function balance(db, id) {
+    var s = 0;
+    db.moves.forEach(function (m) {
+      if (m.clenId !== id || m.storno) return;
+      if (m.typ === 'platba') s += +m.castka;
+      else if (m.typ === 'konzumace') s -= +m.castka;
+    });
+    return r2(s);
+  }
+  var DAY_START_H = 6; // klubový den běží od 6:00 do 6:00 (pivo po půlnoci patří ještě k večeru)
+  function startOfDay(ts) { var d = new Date(ts); d.setHours(DAY_START_H, 0, 0, 0); if (d.getTime() > ts) d.setDate(d.getDate() - 1); return d.getTime(); }
+
+  function who(db, a) {
+    a = a || {};
+    if (a.token) {
+      var m = db.members.filter(function (x) { return x.token === String(a.token) && act(x) && x.typ !== 'host'; })[0];
+      if (!m) err('Tenhle odkaz neplatí. Řekni si pokladníkovi o nový.');
+      return { role: 'member', member: m };
+    }
+    if (a.admin != null) {
+      if (!db.settings.adminPin || String(a.admin) !== String(db.settings.adminPin)) err('Špatný PIN správce.');
+      return { role: 'admin' };
+    }
+    if (a.tablet) {
+      if (String(a.tablet) !== String(db.settings.tabletKey)) err('Neplatný odkaz tabletu.');
+      return { role: 'tablet' };
+    }
+    err('Chybí přístup.');
+  }
+
+  function itemById(db, id) { return db.items.filter(function (x) { return x.id === id; })[0]; }
+  function memberById(db, id) { return db.members.filter(function (x) { return x.id === id; })[0]; }
+  /* ---------- docházka: kdo je v Garage ----------
+     visits: typ 'garaz' = otevřeno (od–do), typ 'clen' = návštěva člena.
+     Bez aktivity (pití, „Jsem tu“) déle než 2 hodiny = automaticky pryč. Nic se nezapisuje při čtení. */
+  var PRES_MS = 2 * 60 * 60 * 1000; // 2 hodiny bez aktivity = odhlášen / zavřeno
+  function vis(db) { return db.visits = db.visits || []; }
+  function vEnd(v) { return +v.do || 0; }
+  function vActive(v, now) { return !vEnd(v) && now - (+v.posledni || 0) < PRES_MS; }
+  function garageOpen(db, now) { return vis(db).filter(function (v) { return v.typ === 'garaz' && !vEnd(v); })[0] || null; }
+  function memberVisit(db, cid) { return vis(db).filter(function (v) { return v.typ === 'clen' && v.clenId === cid && !vEnd(v); })[0] || null; }
+  function isOpen(db, now) {
+    var g = garageOpen(db, now); if (!g) return false;
+    if (now - (+g.posledni || 0) < PRES_MS) return true;
+    return vis(db).some(function (v) { return v.typ === 'clen' && vActive(v, now); });
+  }
+  function closeStale(db, v, now) { // uloží automatický odchod u prošlé návštěvy
+    v.do = Math.min(now, (+v.posledni || 0) + PRES_MS); v.jak = 'automaticky'; op(db, 'update', 'visits', v);
+  }
+  function openGarage(db, now, kdo) {
+    var g = garageOpen(db, now);
+    if (g && isOpen(db, now)) { g.posledni = Math.max(+g.posledni || 0, now); op(db, 'update', 'visits', g); return g; }
+    if (g) {
+      vis(db).forEach(function (v) { if (v.typ === 'clen' && !vEnd(v)) closeStale(db, v, now); });
+      closeStale(db, g, now);
+    }
+    g = { id: newId('g'), typ: 'garaz', clenId: '', od: now, posledni: now, do: 0, jak: '', kdo: kdo };
+    vis(db).push(g); op(db, 'append', 'visits', g);
+    return g;
+  }
+  function touchMember(db, m, ts, kdo) {
+    var now = Date.now(); if (now - ts > PRES_MS) return;      // starý zápis z offline fronty přítomnost nemění
+    var g = openGarage(db, now, kdo);
+    if (m.typ === 'host') return;
+    var v = memberVisit(db, m.id);
+    if (v && !vActive(v, now)) { closeStale(db, v, now); v = null; }
+    if (v) { v.posledni = Math.max(+v.posledni || 0, ts); op(db, 'update', 'visits', v); }
+    else { v = { id: newId('v'), typ: 'clen', clenId: m.id, od: ts, posledni: ts, do: 0, jak: '', kdo: kdo }; vis(db).push(v); op(db, 'append', 'visits', v); }
+    if (+g.posledni < ts) { g.posledni = ts; op(db, 'update', 'visits', g); }
+  }
+  function presenceOut(db, now) {
+    var open = isOpen(db, now), g = open ? garageOpen(db, now) : null;
+    var lidi = open ? vis(db).filter(function (v) { return v.typ === 'clen' && vActive(v, now); }).map(function (v) {
+      var m = memberById(db, v.clenId); return { id: v.clenId, jmeno: m ? m.jmeno : '?', od: +v.od, posledni: +v.posledni };
+    }).sort(function (a, b) { return a.od - b.od; }) : [];
+    var last = vis(db).filter(function (v) { return v.typ === 'garaz'; }).sort(function (a, b) { return b.od - a.od; })[0];
+    return { otevreno: open, od: g ? +g.od : 0, lidi: lidi, timeoutMs: PRES_MS,
+      naposledy: !open && last ? (vEnd(last) || Math.min(now, (+last.posledni || 0) + PRES_MS)) : 0 };
+  }
+  function visitsOut(db, now) {
+    return vis(db).slice().sort(function (a, b) { return b.od - a.od; }).slice(0, 1500).map(function (v) {
+      var m = v.clenId ? memberById(db, v.clenId) : null, end = vEnd(v), act = !end && (v.typ === 'garaz' ? isOpen(db, now) : vActive(v, now));
+      return { id: v.id, typ: v.typ, clenId: v.clenId, jmeno: m ? m.jmeno : '', od: +v.od, do: act ? 0 : (end || Math.min(now, (+v.posledni || 0) + PRES_MS)),
+        jak: act ? '' : (end ? v.jak : 'automaticky'), kdo: v.kdo || '' };
+    });
+  }
+
+  function checkin(db, a, p) {
+    var w = who(db, a), now = Date.now(), m = w.role === 'member' ? w.member : memberById(db, p.clenId);
+    if (!m || !act(m) || m.typ === 'host') err('Člen nenalezen.');
+    if (w.role === 'member' && !isOpen(db, now)) err('Garage je zavřená. Otevře ji tablet nebo správce – nebo si rovnou zapiš pití.');
+    touchMember(db, m, now, w.role);
+    return { ok: true, presence: presenceOut(db, now) };
+  }
+  function checkout(db, a, p) {
+    var w = who(db, a), now = Date.now(), m = w.role === 'member' ? w.member : memberById(db, p.clenId);
+    if (!m) err('Člen nenalezen.');
+    var v = memberVisit(db, m.id);
+    if (v && vActive(v, now)) { v.do = now; v.jak = w.role === 'member' ? 'sam' : w.role; op(db, 'update', 'visits', v); }
+    else if (v) closeStale(db, v, now);
+    return { ok: true, presence: presenceOut(db, now) };
+  }
+  function setOpen(db, a, p) {
+    var w = who(db, a), now = Date.now();
+    if (w.role === 'member') err('Otevírá a zavírá tablet nebo správce.');
+    if (p.otevrit) openGarage(db, now, w.role);
+    else {
+      vis(db).forEach(function (v) {
+        if (v.typ !== 'clen' || vEnd(v)) return;
+        if (vActive(v, now)) { v.do = now; v.jak = 'zavreno'; op(db, 'update', 'visits', v); } else closeStale(db, v, now);
+      });
+      var g = garageOpen(db, now);
+      if (g) { if (isOpen(db, now) || now - g.posledni < PRES_MS) { g.do = now; g.jak = w.role; op(db, 'update', 'visits', g); } else closeStale(db, g, now); }
+    }
+    return { ok: true, presence: presenceOut(db, now) };
+  }
+
+  function stockById(db, id) { return id ? (db.stocks || []).filter(function (x) { return x.id === id; })[0] : null; }
+
+  function mainItem(db, m) {
+    var ok = function (id) { var it = id && itemById(db, id); return it && act(it) ? id : ''; };
+    if (ok(m.oblibena)) return m.oblibena;
+    var c = {}, best = '', bn = 0;
+    db.moves.forEach(function (x) { if (x.clenId === m.id && x.typ === 'konzumace' && !x.storno) c[x.polozkaId] = (c[x.polozkaId] || 0) + (+x.ks || 1); });
+    Object.keys(c).forEach(function (k) { if (c[k] > bn && ok(k)) { bn = c[k]; best = k; } });
+    return best;
+  }
+  function setFav(db, a, p) {
+    var w = who(db, a), m = w.role === 'member' ? w.member : memberById(db, p.clenId);
+    if (!m) err('Člen nenalezen.');
+    if (w.role === 'tablet') err('Hlavní položku si nastaví člen v mobilu nebo správce.');
+    var id = String(p.polozkaId || '');
+    if (id) { var it = itemById(db, id); if (!it || !act(it)) err('Položka není v nabídce.'); }
+    m.oblibena = id; op(db, 'update', 'members', m);
+    return { ok: true };
+  }
+
+  function checkMemberPin() { /* PINy členů zrušeny – na tabletu se zapisuje bez PINu */ }
+
+  function moveOut(db, m) {
+    var it = m.polozkaId ? itemById(db, m.polozkaId) : null;
+    var cl = m.clenId ? memberById(db, m.clenId) : null;
+    var st = stockById(db, m.zasobaId);
+    return { id: m.id, ts: +m.ts, typ: m.typ, clenId: m.clenId, clen: cl ? cl.jmeno : '', polozkaId: m.polozkaId,
+      polozka: it ? it.nazev : '', ks: +m.ks || 0, castka: +m.castka || 0, zdroj: m.zdroj, storno: m.storno ? String(m.storno) : '', pozn: m.pozn || '',
+      zasobaId: m.zasobaId || '', zasoba: st ? st.nazev : '', mnozstvi: +m.mnozstvi || 0, jednotka: st ? st.jednotka : '',
+      zustatek: m.zustatek === '' || m.zustatek == null ? null : +m.zustatek, spotreba: it ? +it.spotreba || 0 : 0 };
+  }
+
+  function settingsOut(db, admin) {
+    var s = db.settings, o = { klub: s.klub || 'Klub', iban: s.iban || '', nizkySklad: +s.nizkySklad || 0 };
+    if (admin) { o.tabletKey = s.tabletKey; }
+    return o;
+  }
+
+  function itemsOut(db, all) {
+    return db.items.filter(function (i) { return all || act(i); })
+      .sort(function (a, b) { return (+a.poradi || 0) - (+b.poradi || 0); })
+      .map(function (i) { return { id: i.id, nazev: i.nazev, cena: +i.cena, zasobaId: i.zasobaId || '', spotreba: +i.spotreba || 0, aktivni: act(i), poradi: +i.poradi || 0 }; });
+  }
+  function stocksOut(db, all) {
+    return (db.stocks || []).filter(function (s) { return !+s.smazano && (all || act(s)); })
+      .sort(function (a, b) { return (+a.poradi || 0) - (+b.poradi || 0); })
+      .map(function (s) { return { id: s.id, nazev: s.nazev, jednotka: s.jednotka === 'l' ? 'l' : 'ks', stav: r3(+s.stav || 0), baleni: +s.baleni || 0,
+        obal: s.obal || '', nizko: +s.nizko || 0, aktivni: act(s), poradi: +s.poradi || 0 }; });
+  }
+
+  function state(db, a, p) {
+    var w = who(db, a), now = Date.now(), today = startOfDay(now);
+    // začátek dne posílá prohlížeč (zná místní čas); server ho jen zkontroluje
+    var ds = Math.round(+(p && p.dayStart) || 0);
+    if (ds && ds <= now && now - ds < 26 * 3600 * 1000) today = ds;
+    if (w.role === 'member') {
+      var me = w.member;
+      var mine = db.moves.filter(function (m) { return m.clenId === me.id; }).sort(function (x, y) { return y.ts - x.ts; });
+      return { role: 'member', settings: settingsOut(db), items: itemsOut(db), stocks: stocksOut(db), presence: presenceOut(db, now),
+        me: { id: me.id, jmeno: me.jmeno, vs: me.vs, balance: balance(db, me.id), oblibena: me.oblibena || '', hlavni: mainItem(db, me) },
+        moves: mine.slice(0, 60).map(function (m) { return moveOut(db, m); }), now: now, undoMs: UNDO_MS };
+    }
+    var admin = w.role === 'admin';
+    var members = db.members.filter(function (m) { return admin || act(m); }).map(function (m) {
+      var todays = db.moves.filter(function (x) { return x.clenId === m.id && x.typ === 'konzumace' && !x.storno && x.ts >= today; });
+      var o = { id: m.id, jmeno: m.jmeno, typ: m.typ, vs: m.vs, aktivni: act(m), hasPin: !!m.pin, balance: balance(db, m.id),
+        oblibena: m.oblibena || '', hlavni: mainItem(db, m),
+        dnesKs: todays.reduce(function (s, x) { return s + (+x.ks || 0); }, 0),
+        dnesKc: r2(todays.reduce(function (s, x) { return s + (+x.castka || 0); }, 0)),
+        lastTs: todays.length ? Math.max.apply(null, todays.map(function (x) { return +x.ts; })) : 0 };
+      if (admin) { o.token = m.token; o.pin = m.pin; }
+      return o;
+    });
+    var moves = db.moves.slice().sort(function (x, y) { return y.ts - x.ts; }).slice(0, admin ? 3000 : 80);
+    return { role: w.role, settings: settingsOut(db, admin), items: itemsOut(db, admin), stocks: stocksOut(db, admin), members: members,
+      presence: presenceOut(db, now), visits: admin ? visitsOut(db, now) : undefined,
+      moves: moves.map(function (m) { return moveOut(db, m); }), now: now, undoMs: UNDO_MS };
+  }
+
+  function add(db, a, p) {
+    var w = who(db, a), m;
+    if (w.role === 'member') m = w.member;
+    else {
+      m = memberById(db, p.clenId);
+      if (!m || !act(m)) err('Člen nenalezen.');
+      if (w.role === 'tablet') checkMemberPin(m, p.pin);
+    }
+    var it = itemById(db, p.polozkaId);
+    if (!it || !act(it)) err('Položka není v nabídce.');
+    var ks = Math.round(+p.ks || 1);
+    if (ks < 1 || ks > 20) err('Počet musí být 1–20.');
+    // offline fronta: klient posílá vlastní id (qid) a čas zápisu; opakované odeslání se nezapíše dvakrát
+    var qid = (typeof p.qid === 'string' && /^q[a-z0-9]{6,40}$/.test(p.qid)) ? p.qid : null;
+    if (qid) {
+      var dup = db.moves.filter(function (x) { return x.id === qid; })[0];
+      if (dup) return { ok: true, dup: true, move: moveOut(db, dup), balance: balance(db, dup.clenId) };
+    }
+    var ts = Date.now(), cts = Math.round(+p.ts || 0);
+    if (cts && cts < ts && ts - cts < 72 * 3600 * 1000) ts = cts;
+    var st = stockById(db, it.zasobaId), q = st ? r3(ks * (+it.spotreba || 0)) : 0;
+    var mv = { id: qid || newId('k'), ts: ts, typ: 'konzumace', clenId: m.id, polozkaId: it.id, ks: ks,
+      castka: r2(ks * +it.cena), zdroj: w.role, storno: 0, pozn: '', zasobaId: st ? st.id : '', mnozstvi: q };
+    db.moves.push(mv); op(db, 'append', 'moves', mv);
+    if (st) { st.stav = r3((+st.stav || 0) - q); op(db, 'update', 'stocks', st); }
+    touchMember(db, m, ts, w.role); // pití = jsem v Garage (a Garage je otevřená)
+    return { ok: true, move: moveOut(db, mv), balance: balance(db, m.id) };
+  }
+
+  function undo(db, a, p) {
+    var w = who(db, a);
+    var mv = db.moves.filter(function (x) { return x.id === p.moveId; })[0];
+    if (!mv || mv.storno) err('Záznam už je zrušený nebo neexistuje.');
+    if (w.role !== 'admin') {
+      if (mv.typ !== 'konzumace') err('Tohle může zrušit jen správce.');
+      if (Date.now() - mv.ts > UNDO_MS) err('Na zrušení je čas jen 2 minuty. Řekni to pokladníkovi.');
+      if (w.role === 'member' && mv.clenId !== w.member.id) err('Cizí záznam.');
+      if (w.role === 'tablet') checkMemberPin(memberById(db, mv.clenId) || {}, p.pin);
+    }
+    mv.storno = w.role; op(db, 'update', 'moves', mv);
+    var st = stockById(db, mv.zasobaId), q = +mv.mnozstvi || 0;
+    if (st && mv.typ === 'konzumace') { st.stav = r3((+st.stav || 0) + q); op(db, 'update', 'stocks', st); }
+    if (st && mv.typ === 'naskladneni') { st.stav = r3((+st.stav || 0) - q); op(db, 'update', 'stocks', st); }
+    return { ok: true };
+  }
+
+  function pay(db, a, p) {
+    var w = who(db, a), m = memberById(db, p.clenId);
+    if (!m) err('Člen nenalezen.');
+    if (w.role === 'member') err('Platbu potvrzuje pokladník.');
+    if (w.role === 'tablet') err('Platbu zapisuje jen správce.');
+    var c = r2(+p.castka);
+    if (!(c > 0) || c > 100000) err('Zadej částku.');
+    var zp = p.zpusob === 'qr' ? 'qr' : 'hotove';
+    var mv = { id: newId('p'), ts: Date.now(), typ: 'platba', clenId: m.id, polozkaId: '', ks: 0, castka: c,
+      zdroj: w.role, storno: 0, pozn: zp, zustatek: r2(balance(db, m.id) + c) };
+    db.moves.push(mv); op(db, 'append', 'moves', mv);
+    return { ok: true, balance: balance(db, m.id) };
+  }
+
+  function needAdmin(db, a) { if (who(db, a).role !== 'admin') err('Jen pro správce.'); }
+
+  function stock(db, a, p) {
+    needAdmin(db, a);
+    var st = stockById(db, p.zasobaId); if (!st) err('Zásoba nenalezena.');
+    var q, bal = 0;
+    if (p.inventura) {
+      var v = num(p.stav); if (!(v >= 0)) err('Zadej skutečný stav.');
+      q = r3(v - (+st.stav || 0)); if (!q) return { ok: true };
+    } else if (p.baleni != null && p.baleni !== '') {
+      bal = num(p.baleni); if (!bal) err('Zadej počet.');
+      var size = num(p.velikost); if (!(size > 0)) size = +st.baleni || 1;
+      q = r3(bal * size);
+    } else { q = r3(num(p.mnozstvi)); if (!q) err('Zadej množství.'); }
+    var mv = { id: newId('n'), ts: Date.now(), typ: 'naskladneni', clenId: '', polozkaId: '', ks: bal, castka: 0,
+      zdroj: 'admin', storno: 0, pozn: p.inventura ? 'inventura' : (bal && st.jednotka === 'l' ? bal + '× ' + String(r3(q / bal)).replace('.', ',') + ' l' : ''), zasobaId: st.id, mnozstvi: q };
+    db.moves.push(mv); op(db, 'append', 'moves', mv);
+    st.stav = r3((+st.stav || 0) + q); op(db, 'update', 'stocks', st);
+    return { ok: true };
+  }
+
+  function newStock(db, o) {
+    var max = (db.stocks || []).reduce(function (s, x) { return Math.max(s, +x.poradi || 0); }, 0);
+    var st = { id: newId('z'), nazev: o.nazev, jednotka: o.jednotka, stav: 0, baleni: o.baleni, obal: o.obal, nizko: o.nizko, aktivni: 1, poradi: max + 10 };
+    (db.stocks = db.stocks || []).push(st); op(db, 'append', 'stocks', st);
+    return st;
+  }
+  function newItem(db, o) {
+    var max = db.items.reduce(function (s, x) { return Math.max(s, +x.poradi || 0); }, 0);
+    var it = { id: newId('i'), nazev: o.nazev, cena: o.cena, zasobaId: o.zasobaId || '', spotreba: o.spotreba || 0, aktivni: 1, poradi: max + 10 };
+    db.items.push(it); op(db, 'append', 'items', it);
+    return it;
+  }
+  function checkSell(list, jed) { // položky k prodeji zadané rovnou se zásobou – nejdřív vše zkontrolovat, pak teprve zapisovat
+    return (Array.isArray(list) ? list : []).filter(function (x) { return x && String(x.nazev || '').trim(); }).map(function (x) {
+      var c = num(x.cena); if (!(c >= 0)) err('Zadej cenu u položky „' + String(x.nazev).trim() + '“.');
+      var sp = jed === 'ks' ? (num(x.spotreba) > 0 ? num(x.spotreba) : 1) : num(x.spotreba);
+      if (!(sp > 0)) err('Zadej objem u položky „' + String(x.nazev).trim() + '“ (např. 0,5).');
+      return { nazev: String(x.nazev).trim(), cena: r2(c), spotreba: r3(sp) };
+    });
+  }
+
+  function saveStock(db, a, p) {
+    needAdmin(db, a);
+    var nazev = String(p.nazev || '').trim(); if (!nazev) err('Zadej název zásoby.');
+    var jed = p.jednotka === 'l' ? 'l' : 'ks';
+    var baleni = num(p.baleni); if (!(baleni > 0)) baleni = jed === 'l' ? 15 : 1;
+    var obal = String(p.obal || '').trim() || (jed === 'l' ? 'sud' : 'balení');
+    var nizko = num(p.nizko); if (!(nizko >= 0)) nizko = 0;
+    var st = p.id ? stockById(db, p.id) : null;
+    if (st) {
+      st.nazev = nazev; st.jednotka = jed; st.baleni = baleni; st.obal = obal; st.nizko = nizko; st.aktivni = p.aktivni === false ? 0 : 1;
+      op(db, 'update', 'stocks', st);
+    } else {
+      var sell = checkSell(p.polozky, jed);
+      if (p.nizko == null || p.nizko === '') nizko = jed === 'l' ? 5 : 5;
+      st = newStock(db, { nazev: nazev, jednotka: jed, baleni: baleni, obal: obal, nizko: nizko });
+      var made = sell.map(function (x) { return newItem(db, { nazev: x.nazev, cena: x.cena, zasobaId: st.id, spotreba: x.spotreba }).nazev; });
+      return { ok: true, id: st.id, polozky: made };
+    }
+    return { ok: true, id: st.id };
+  }
+
+  function deleteStock(db, a, p) {
+    needAdmin(db, a);
+    var st = stockById(db, p.id); if (!st || +st.smazano) err('Zásoba nenalezena.');
+    // měkké smazání: z nabídky zmizí, historie pohybů si název ponechá
+    st.smazano = 1; st.aktivni = 0; op(db, 'update', 'stocks', st);
+    var odpojeno = [];
+    db.items.forEach(function (it) {
+      if (it.zasobaId === st.id) { it.zasobaId = ''; it.spotreba = 0; op(db, 'update', 'items', it); odpojeno.push(it.nazev); }
+    });
+    return { ok: true, odpojeno: odpojeno };
+  }
+
+  function saveItem(db, a, p) {
+    needAdmin(db, a);
+    var nazev = String(p.nazev || '').trim(); if (!nazev) err('Zadej název.');
+    var cena = r2(+p.cena); if (!(cena >= 0)) err('Zadej cenu.');
+    var zid = String(p.zasobaId || ''), sp = 0, mkStock = zid === 'novy';
+    if (mkStock) {
+      if ((db.stocks || []).some(function (z) { return !+z.smazano && z.nazev.toLowerCase() === nazev.toLowerCase(); })) err('Zásoba „' + nazev + '“ už existuje – vyber ji v seznamu.');
+      zid = newStock(db, { nazev: nazev, jednotka: 'ks', baleni: 1, obal: 'ks', nizko: 5 }).id; sp = 1;
+    } else if (zid) {
+      var st = stockById(db, zid); if (!st || +st.smazano) err('Vybraná zásoba neexistuje.');
+      sp = r3(num(p.spotreba)); if (!(sp > 0)) err('Zadej, kolik položka ubere ze zásoby (např. 0,5 l).');
+    }
+    var it = p.id ? itemById(db, p.id) : null;
+    if (it) {
+      it.nazev = nazev; it.cena = cena; it.aktivni = p.aktivni === false ? 0 : 1; it.zasobaId = zid; it.spotreba = sp;
+      if (p.poradi != null && p.poradi !== '') it.poradi = +p.poradi;
+      op(db, 'update', 'items', it);
+    } else {
+      var max = db.items.reduce(function (s, x) { return Math.max(s, +x.poradi || 0); }, 0);
+      it = { id: newId('i'), nazev: nazev, cena: cena, zasobaId: zid, spotreba: sp, aktivni: 1, poradi: max + 10 };
+      db.items.push(it); op(db, 'append', 'items', it);
+    }
+    return { ok: true, id: it.id };
+  }
+
+  function saveMember(db, a, p) {
+    needAdmin(db, a);
+    var jmeno = String(p.jmeno || '').trim(); if (!jmeno) err('Zadej jméno.');
+    var pin = String(p.pin == null ? '' : p.pin).trim();
+    if (pin && !/^\d{4}$/.test(pin)) err('PIN musí mít 4 číslice.');
+    var m = p.id ? memberById(db, p.id) : null;
+    if (m) {
+      m.jmeno = jmeno; if (p.pin != null) m.pin = pin; m.aktivni = p.aktivni === false ? 0 : 1;
+      if (p.novyOdkaz) m.token = newToken();
+      op(db, 'update', 'members', m);
+    } else {
+      var vs = db.members.reduce(function (s, x) { return Math.max(s, +x.vs || 0); }, 100) + 1;
+      m = { id: newId('c'), jmeno: jmeno, token: newToken(), pin: '', typ: 'clen', aktivni: 1, vs: vs };
+      db.members.push(m); op(db, 'append', 'members', m);
+    }
+    return { ok: true, id: m.id };
+  }
+
+  function saveSettings(db, a, p) {
+    needAdmin(db, a);
+    var s = db.settings, ch = {};
+    if (p.klub != null) ch.klub = String(p.klub).trim() || 'Klub';
+    if (p.iban != null) {
+      var ib = String(p.iban).replace(/\s+/g, '').toUpperCase();
+      if (ib && !/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(ib)) err('IBAN nevypadá správně (např. CZ65 0800 …).');
+      ch.iban = ib;
+    }
+    if (p.nizkySklad != null) ch.nizkySklad = Math.max(0, Math.round(+p.nizkySklad || 0));
+    if (p.adminPin) { if (!/^\d{4,8}$/.test(String(p.adminPin))) err('PIN správce: 4–8 číslic.'); ch.adminPin = String(p.adminPin); }
+    if (p.novyTablet) ch.tabletKey = newToken() + newToken();
+    Object.keys(ch).forEach(function (k) { s[k] = ch[k]; op(db, 'setting', k, ch[k]); });
+    return { ok: true };
+  }
+
+  function checkPin(db, a, p) {
+    var w = who(db, a), m = memberById(db, p.clenId);
+    if (!m || !act(m)) err('Člen nenalezen.');
+    if (w.role === 'tablet') checkMemberPin(m, p.pin);
+    return { ok: true };
+  }
+
+  var API = { state: state, checkPin: checkPin, add: add, checkin: checkin, checkout: checkout, setOpen: setOpen, setFav: setFav, undo: undo, pay: pay, stock: stock, saveStock: saveStock, deleteStock: deleteStock, saveItem: saveItem, saveMember: saveMember, saveSettings: saveSettings };
+  function run(db, action, auth, payload) {
+    if (!API[action]) err('Neznámá akce.');
+    return API[action](db, auth, payload || {});
+  }
+  return { run: run, newToken: newToken, newId: newId, rnd: rnd, READS: { state: 1, checkPin: 1 } };
+})();
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var DEMO = !API_URL;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var app = $('#app'), sheet = $('#sheet');
+  var BASE = location.origin + location.pathname;
+  var ROUTE = {}, AUTH = null, ST = null, SKEW = 0, POLL = null;
+
+  /* ---------- utils ---------- */
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var nf = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 });
+  function kc(n) { return nf.format(n) + '\u00a0Kč'; }
+  function fmtNum(n) { return nf.format(Math.round((+n || 0) * 100) / 100); }
+  function fmtQ(n, j) { return fmtNum(n) + '\u00a0' + (j || 'ks'); }
+  function num(v) { return parseFloat(String(v == null ? '' : v).replace(',', '.')); }
+  function stockOf(i) { return i && i.zasobaId ? (ST.stocks || []).filter(function (z) { return z.id === i.zasobaId; })[0] : null; }
+  function balHtml(b, cls) {
+    var lab = b > 0 ? 'Kredit' : b < 0 ? 'Dluh' : 'Vyrovnáno', c = b > 0 ? 'good' : b < 0 ? 'bad' : 'muted';
+    return '<div class="' + (cls || '') + '"><div class="bal-label ' + c + '">' + lab + '</div><div class="bal ' + c + '">' + (b ? kc(Math.abs(b)) : '0 Kč') + '</div></div>';
+  }
+  function tm(ts) { var d = new Date(ts); return d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }); }
+  function dt(ts) {
+    var d = new Date(ts), t = new Date(); var same = d.toDateString() === t.toDateString();
+    return same ? 'dnes ' + tm(ts) : d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) + ' ' + tm(ts);
+  }
+  function now() { return Date.now() + SKEW; }
+  var DAY_START_H = 6; // klubový den: 6:00–6:00
+  function startToday() { var t = now(), d = new Date(t); d.setHours(DAY_START_H, 0, 0, 0); if (d.getTime() > t) d.setDate(d.getDate() - 1); return d.getTime(); }
+  var DAY_NOTE = 'Den se počítá od 6:00 do 6:00 – co vypiješ po půlnoci, patří ještě k večeru. V záznamech je vždy skutečný čas.';
+  function dayInfo() { return '<span class="info" tabindex="0" title="' + DAY_NOTE + '" aria-label="' + DAY_NOTE + '">i</span>'; }
+  function ss(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { return null; } }
+
+  var toastT;
+  function toast(msg, opt) {
+    opt = opt || {};
+    var t = $('#toast'); clearTimeout(toastT);
+    t.className = 'toast' + (opt.err ? ' err' : '');
+    t.innerHTML = '<span>' + esc(msg) + '</span>' + (opt.action ? '<button type="button">' + esc(opt.action) + '</button>' : '');
+    t.hidden = false;
+    if (opt.action) t.querySelector('button').onclick = function () { t.hidden = true; opt.fn(); };
+    toastT = setTimeout(function () { t.hidden = true; }, opt.ms || (opt.err ? 4500 : 3000));
+  }
+  function fail(e) { try { sfx('err'); } catch (x) {} toast(e && e.message ? e.message : 'Něco se pokazilo. Zkus to znovu.', { err: true }); }
+
+  /* ---------- QR ---------- */
+  function qrSvg(text) {
+    try {
+      if (qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs['UTF-8']) qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+      var q = qrcode(0, 'M'); q.addData(text); q.make();
+      return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    } catch (e) { return '<div class="muted">QR se nepodařilo vytvořit.</div>'; }
+  }
+  function ascii(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 .,\-]/g, ''); }
+  function spd(iban, castka, vs, msg) {
+    var s = 'SPD*1.0*ACC:' + iban + '*AM:' + (Math.round(castka * 100) / 100).toFixed(2) + '*CC:CZK';
+    if (vs) s += '*X-VS:' + vs;
+    if (msg) s += '*MSG:' + ascii(msg).slice(0, 60);
+    return s;
+  }
+  function ibanPretty(i) { return String(i || '').replace(/(.{4})/g, '$1 ').trim(); }
+  function payBox(castka, vs, msg) {
+    var s = ST.settings;
+    if (!s.iban) return '<p class="muted">Účet pro QR platby zatím není nastavený. Plať hotově pokladníkovi.</p>';
+    return '<div class="qrbox"><div class="qr">' + qrSvg(spd(s.iban, castka, vs, msg)) + '</div><div class="qrinfo">' +
+      '<div class="eyebrow">Naskenuj v bankovní aplikaci</div><div class="bal" style="font-size:1.8rem">' + kc(castka) + '</div>' +
+      '<div class="mono">' + esc(ibanPretty(s.iban)) + '</div>' + (vs ? '<div class="muted">VS ' + esc(vs) + '</div>' : '') + '</div></div>';
+  }
+  function copy(text, btn) {
+    var done = function () { toast('Zkopírováno'); };
+    try { navigator.clipboard.writeText(text).then(done, function () { selectFallback(btn); }); } catch (e) { selectFallback(btn); }
+  }
+  function selectFallback(btn) {
+    var el = btn && btn.parentNode && btn.parentNode.querySelector('.mono');
+    if (el) { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Označeno – zkopíruj ručně'); }
+  }
+
+  /* ---------- API ---------- */
+  function api(action, payload, auth) {
+    auth = auth || AUTH;
+    var p;
+    if (DEMO) {
+      p = new Promise(function (res, rej) {
+        setTimeout(function () {
+          if (DEMO_OFFLINE) return rej(netErr());
+          try { DEMO_DB._ops = []; res(JSON.parse(JSON.stringify(CORE.run(DEMO_DB, action, auth, payload)))); }
+          catch (e) { rej(new Error(e.message)); }
+        }, 90);
+      });
+    } else {
+      var ctl = window.AbortController ? new AbortController() : null, tmo = setTimeout(function () { if (ctl) ctl.abort(); }, 15000);
+      p = fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, auth: auth, payload: payload || {} }), signal: ctl ? ctl.signal : undefined })
+        .then(function (r) { return r.text(); }).then(function (t) {
+          clearTimeout(tmo); var j; try { j = JSON.parse(t); } catch (e) { throw netErr(); }
+          if (!j.ok) throw new Error(j.error || 'Chyba serveru.'); return j;
+        }, function () { clearTimeout(tmo); throw netErr(); });
+    }
+    return p.then(function (j) { setNet(false); return j; }, function (e) { if (e.net) setNet(true); throw e; });
+  }
+  function netErr() { var e = new Error('Bez internetu. Zkus to za chvíli.'); e.net = true; return e; }
+
+  /* ---------- offline fronta zápisů ---------- */
+  var DEMO_OFFLINE = false, NET_DOWN = false, Q = [], QKEY = '', LAST = null, FLUSHING = false;
+  function qLoad() { QKEY = 'pk_q_' + JSON.stringify(AUTH); Q = []; try { Q = JSON.parse(localStorage.getItem(QKEY) || '[]') || []; } catch (e) {} netBar(); }
+  function qSave() { try { localStorage.setItem(QKEY, JSON.stringify(Q)); } catch (e) {} netBar(); }
+  function setNet(down) { if (NET_DOWN !== down) { NET_DOWN = down; netBar(); } }
+  function plural(n, a, b, c) { return n === 1 ? a : (n > 1 && n < 5 ? b : c); }
+  function netBar() {
+    var b = $('#net'); if (!b) return;
+    var n = Q.length;
+    b.hidden = !NET_DOWN && !n;
+    b.className = 'wrap netbar' + (NET_DOWN ? ' down' : '');
+    b.innerHTML = NET_DOWN
+      ? '<b>Bez internetu.</b> <span>' + (n ? n + ' ' + plural(n, 'zápis čeká', 'zápisy čekají', 'zápisů čeká') + ' v tomhle zařízení. Odešle se to samo, až naskočí internet.' : 'Zápisy se uloží do zařízení a odešlou se samy.') + '</span>'
+      : '<b>Odesílám ' + n + ' ' + plural(n, 'zápis', 'zápisy', 'zápisů') + ' z doby bez internetu…</b>';
+  }
+  function applyQueue() {
+    if (!ST || !Q.length) return;
+    Q.forEach(function (q) {
+      var p = q.p; if (ST.moves.some(function (m) { return m.id === p.qid; })) return;
+      var it = ST.items.filter(function (i) { return i.id === p.polozkaId; })[0]; if (!it) return;
+      var cid = p.clenId || (ST.me && ST.me.id), ks = p.ks || 1, cast = Math.round(it.cena * ks * 100) / 100;
+      var mem = ST.me && ST.me.id === cid ? ST.me : (ST.members || []).filter(function (m) { return m.id === cid; })[0];
+      ST.moves.unshift({ id: p.qid, ts: p.ts, typ: 'konzumace', clenId: cid, clen: mem ? mem.jmeno : '', polozkaId: it.id, polozka: it.nazev, ks: ks, castka: cast, zdroj: ST.role, storno: '', pozn: '', pending: true });
+      var zq = stockOf(it); if (zq) zq.stav = Math.round((zq.stav - ks * it.spotreba) * 1000) / 1000;
+      if (mem) {
+        mem.balance = Math.round((mem.balance - cast) * 100) / 100;
+        if (mem.dnesKs != null && p.ts >= startToday()) { mem.dnesKs += ks; mem.dnesKc += cast; mem.lastTs = Math.max(mem.lastTs || 0, p.ts); }
+      }
+    });
+    ST.moves.sort(function (a, b) { return b.ts - a.ts; });
+  }
+  function rebuildST() { if (LAST) { ST = JSON.parse(JSON.stringify(LAST)); applyQueue(); } }
+  function flush() {
+    if (FLUSHING || !Q.length || !AUTH || AUTH.admin != null) return;
+    FLUSHING = true; netBar();
+    var sent = false;
+    (function next() {
+      if (!Q.length) { FLUSHING = false; netBar(); if (sent) load().then(function () { if (renderCurrent) renderCurrent(); }, function () {}); return; }
+      api('add', Q[0].p).then(function () { Q.shift(); qSave(); sent = true; next(); }, function (e) {
+        if (e.net) { FLUSHING = false; netBar(); return; }
+        Q.shift(); qSave(); sent = true;
+        toast('Zápis z doby bez internetu se nepodařilo uložit: ' + e.message, { err: true, ms: 7000 }); next();
+      });
+    })();
+  }
+  setInterval(flush, 15000);
+  window.addEventListener('online', function () { flush(); });
+  function addDrink(p) {
+    p.qid = 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    p.ts = now(); p.ks = p.ks || 1;
+    if (Q.length) { Q.push({ p: p }); qSave(); setTimeout(flush, 0); return Promise.resolve({ queued: true }); } // nepředbíhat frontu
+    return api('add', p).then(function (r) { return { r: r }; }, function (e) {
+      if (!e.net) throw e;
+      Q.push({ p: p }); qSave(); return { queued: true };
+    });
+  }
+  function tapAdd(p, who) {
+    var it = ST.items.filter(function (i) { return i.id === p.polozkaId; })[0];
+    var lbl = (who ? who + ': ' : '') + (it ? it.nazev : '') + ' +1';
+    addDrink(p).then(function (res) {
+      if (PS.on && PS.bony && it) printBon({ id: p.qid, ts: p.ts, ks: p.ks || 1, polozka: it.nazev, spotreba: it.spotreba, jednotka: (stockOf(it) || {}).jednotka, clen: who || (ST.me && ST.me.jmeno) || '', zdroj: ST.role });
+      var undo = { action: 'Zpět', fn: function () { undoMove(p.qid); }, ms: 6000 };
+      if (res.queued) { rebuildST(); renderCurrent(); toast(lbl + (NET_DOWN ? ' · uloženo v zařízení' : ''), undo); return; }
+      toast(lbl, undo);
+      return load().then(renderCurrent);
+    }).catch(fail);
+  }
+  function loadOrCache() {
+    return load().catch(function (e) {
+      if (!e.net) throw e;
+      var c = null; try { c = JSON.parse(localStorage.getItem('pk_s_' + JSON.stringify(AUTH)) || 'null'); } catch (x) {}
+      if (!c) throw new Error('Bez internetu a v tomhle zařízení zatím nejsou uložená data. Připoj se a otevři stránku znovu.');
+      LAST = c; rebuildST(); return ST;
+    });
+  }
+  function load() {
+    return api('state', { dayStart: startToday() }).then(function (s) {
+      LAST = s; SKEW = s.now - Date.now(); ST = JSON.parse(JSON.stringify(s)); applyQueue();
+      if (AUTH && AUTH.admin == null) { try { localStorage.setItem('pk_s_' + JSON.stringify(AUTH), JSON.stringify(s)); } catch (e) {} }
+      if (Q.length && !FLUSHING) setTimeout(flush, 0);
+      try { printWatch(ST); } catch (e) {}
+      return ST;
+    });
+  }
+  function poll(ms, fn) {
+    clearInterval(POLL);
+    POLL = setInterval(function () { if (document.hidden) return; load().then(fn, function () {}); }, ms);
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && ST && renderCurrent) load().then(renderCurrent, function () {}); });
+  var renderCurrent = null;
+
+  /* ---------- shared: item tiles ---------- */
+  function tilesHtml(items, counts, mainId) {
+    if (!items.length) return '<div class="empty">Zatím žádné položky. Přidá je správce.</div>';
+    var main = mainId && items.filter(function (i) { return i.id === mainId; })[0];
+    var tile = function (i, big) {
+      var c = counts && counts[i.id];
+      return '<button type="button" class="tile' + (c ? ' has' : '') + (big ? ' big' : '') + '" data-item="' + esc(i.id) + '">' + (big ? '<span class="eyebrow">Hlavní · ťukni +1</span>' : '') + '<span class="n">' + esc(i.nazev) + '</span>' +
+        '<span class="ft"><span class="p">' + kc(i.cena) + '</span>' + (function (z) { return z ? '<span class="s' + (z.stav <= z.nizko ? ' low' : '') + '">' + (z.stav <= 0 ? 'došlo?' : fmtQ(z.stav, z.jednotka)) + '</span>' : ''; })(stockOf(i)) + '</span>' +
+        (c ? '<span class="cnt">' + c + '×</span>' : '') + '</button>';
+    };
+    return (main ? tile(main, true) : '') + '<div class="tiles">' + items.filter(function (i) { return i !== main; }).map(function (i) { return tile(i, false); }).join('') + '</div>';
+  }
+  function favPicker(cur, auto) {
+    return '<div class="favpick"><label for="fav_sel">Hlavní tlačítko</label><select id="fav_sel"><option value="">' + (auto && !cur ? 'Automaticky (nejčastější)' : 'Automaticky (nejčastější)') + '</option>' +
+      ST.items.map(function (i) { return '<option value="' + i.id + '"' + (cur === i.id ? ' selected' : '') + '>' + esc(i.nazev) + '</option>'; }).join('') + '</select></div>';
+  }
+  function todayCounts(moves, clenId) {
+    var t = startToday(), c = {}, sum = 0;
+    moves.forEach(function (m) {
+      if (m.typ !== 'konzumace' || m.storno || m.ts < t || (clenId && m.clenId !== clenId)) return;
+      c[m.polozkaId] = (c[m.polozkaId] || 0) + m.ks; sum += m.castka;
+    });
+    return { c: c, sum: sum };
+  }
+  function stornoLab(m) { return { member: 'zrušil sám', tablet: 'zrušeno na tabletu', admin: 'zrušil správce' }[m.storno] || 'zrušeno'; }
+  function stornoWho(m) { return { member: m.clen + ' (mobil)', tablet: 'tablet', admin: 'správce' }[m.storno] || 'zrušeno'; }
+  function canUndo(m) { return m.typ === 'konzumace' && !m.storno && (m.pending || now() - m.ts < ST.undoMs); }
+  function pendLab(m) { return m.pending ? '<span class="pendlab">čeká na internet</span>' : ''; }
+  function pulse(btn) { btn.classList.remove('pulse'); void btn.offsetWidth; btn.classList.add('pulse'); sfx(btn.classList.contains('big') ? 'big' : 'tap'); }
+
+  /* ---------- zvuky (syntetizované přes Web Audio, žádné soubory) ---------- */
+  var SND = (function () { try { return localStorage.getItem('pk_snd') !== '0'; } catch (e) { return true; } })();
+  var ACX = null;
+  function ac() {
+    if (!ACX) {
+      // iPhone: zvuk hrát i v tichém režimu (přepínač na boku) – vypíná se tlačítkem s reproduktorem v aplikaci
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+      var C = window.AudioContext || window.webkitAudioContext; if (!C) return null; try { ACX = new C(); } catch (e) { return null; }
+    }
+    if (ACX.state !== 'running') { try { ACX.resume(); } catch (e) {} }
+    return ACX;
+  }
+  // iOS pustí zvuk až po „odemčení“ přímo v dotyku: při prvních dotycích zahrajeme neslyšitelný krátký zvuk
+  var AUNLOCKED = false;
+  function audioUnlock() {
+    if (AUNLOCKED || !SND) return;
+    var c = ac(); if (!c) return;
+    try {
+      var b = c.createBuffer(1, 1, 22050), src = c.createBufferSource(); src.buffer = b; src.connect(c.destination); src.start(0);
+      if (c.state === 'running') AUNLOCKED = true;
+    } catch (e) {}
+  }
+  ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, audioUnlock, { capture: true, passive: true }); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && ACX && ACX.state !== 'running') { AUNLOCKED = false; } });
+  function tone(f0, f1, dur, type, vol, delay) {
+    var c = ac(); if (!c) return;
+    var t = c.currentTime + (delay || 0) + (c.state === 'running' ? 0 : 0.05), o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.25, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function sfx(kind) {
+    try { if (navigator.vibrate) navigator.vibrate(kind === 'err' ? [40, 40, 40] : 12); } catch (e) {}
+    if (!SND) return;
+    try {
+      if (kind === 'tap') { tone(880, 1320, 0.07, 'triangle', 0.22); }                       // krátké „ťuk“
+      else if (kind === 'big') { tone(660, 990, 0.08, 'triangle', 0.25); tone(1320, 0, 0.18, 'sine', 0.12, 0.06); } // „cink“ sklenice
+      else if (kind === 'ok') { tone(784, 0, 0.12, 'sine', 0.2); tone(1175, 0, 0.2, 'sine', 0.18, 0.1); }  // potvrzení
+      else if (kind === 'undo') { tone(700, 350, 0.16, 'triangle', 0.2); }                     // klesající tón
+      else if (kind === 'err') { tone(220, 180, 0.22, 'square', 0.12); }                       // bzučák
+    } catch (e) {}
+  }
+  function sndBtn() {
+    return '<button class="btn ghost small sndbtn" id="snd" aria-pressed="' + SND + '" title="Zvuky ' + (SND ? 'zapnuté' : 'vypnuté') + '">' +
+      (SND ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+           : '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>') +
+      '<span class="sr">' + (SND ? 'Vypnout zvuky' : 'Zapnout zvuky') + '</span></button>';
+  }
+  function wireSnd() {
+    var b = $('#snd'); if (!b) return;
+    b.onclick = function () { SND = !SND; try { localStorage.setItem('pk_snd', SND ? '1' : '0'); } catch (e) {} if (SND) sfx('ok'); b.outerHTML = sndBtn(); wireSnd(); toast(SND ? 'Zvuky zapnuté' : 'Zvuky vypnuté'); };
+  }
+
+  /* ================= TISK: bony pro bar + potvrzení úhrad =================
+     Zapíná se jen na počítači u tiskárny (Správce → Nastavení → Tiskárna). Nastavení je uložené v tomhle prohlížeči.
+     Počítač hlídá nové zápisy (z mobilů, tabletu i od správce) a každý vytiskne jako samostatný bon.
+     Tichý tisk bez dialogu zajistí Chrome spuštěný s --kiosk-printing. */
+  var PS = (function () { var d = { on: false, bony: true, storna: true, uhrady: true, since: 0 }; try { var x = JSON.parse(localStorage.getItem('pk_print') || 'null'); if (x) for (var k in x) d[k] = x[k]; } catch (e) {} return d; })();
+  var PDONE = (function () { try { return JSON.parse(localStorage.getItem('pk_printed') || '[]'); } catch (e) { return []; } })();
+  var PQ = [], PBUSY = false;
+  function psSave() { try { localStorage.setItem('pk_print', JSON.stringify(PS)); } catch (e) {} }
+  function pdMark(k) { if (PDONE.indexOf(k) < 0) { PDONE.push(k); if (PDONE.length > 800) PDONE = PDONE.slice(-600); try { localStorage.setItem('pk_printed', JSON.stringify(PDONE)); } catch (e) {} } }
+  function pdHas(k) { return PDONE.indexOf(k) >= 0; }
+  function stamp(ts) { var d = new Date(ts); return d.toLocaleDateString('cs-CZ') + ' ' + d.toLocaleTimeString('cs-CZ'); }
+  function bonHtml(m, storno) {
+    var vol = m.jednotka === 'l' && m.spotreba ? ' ' + fmtNum(m.spotreba) + ' l' : '';
+    return '<div class="bon' + (storno ? ' storno' : '') + '"><div class="bh">' + (storno ? 'STORNO – NETOČIT' : 'BON PRO BAR') + '</div>' +
+      '<div>' + esc(ST.settings.klub) + '</div><div>' + stamp(m.ts) + '</div><div class="sep"></div>' +
+      '<div class="big">' + (m.ks || 1) + '× ' + esc(m.polozka) + esc(vol) + '</div>' +
+      '<div class="row2"><span>Kdo:</span><b>' + esc(m.clen || '?') + '</b></div>' +
+      '<div class="row2"><span>Zapsáno:</span><span>' + ({ member: 'mobil', tablet: 'tablet', admin: 'správce' }[m.zdroj] || '') + '</span></div>' +
+      (storno ? '<div class="sep"></div><div class="ctr">Zrušeno ' + stamp(Date.now()) + '</div>' : '') + '</div>';
+  }
+  function payHtml(m) {
+    var z = m.zustatek;
+    return '<div class="bon"><div class="bh">POTVRZENÍ ÚHRADY</div><div>' + esc(ST.settings.klub) + '</div><div>' + stamp(m.ts) + '</div><div class="sep"></div>' +
+      '<div class="row2"><span>Člen:</span><b>' + esc(m.clen) + '</b></div>' +
+      '<div class="row2"><span>Způsob:</span><span>' + (m.pozn === 'qr' ? 'převodem / QR' : 'hotově') + '</span></div>' +
+      '<div class="big row2"><span>Přijato</span><span>' + kc(m.castka) + '</span></div>' +
+      (z != null ? '<div class="sep"></div><div class="row2"><span>Zůstatek po úhradě:</span><b>' + (z > 0 ? '+' : z < 0 ? '−' : '') + kc(Math.abs(z)) + '</b></div><div class="ctr">' + (z > 0 ? '(kredit)' : z < 0 ? '(dluh)' : '(vyrovnáno)') + '</div>' : '') +
+      '<div class="sep"></div><div class="ctr">Díky!</div></div>';
+  }
+  function printJob(html, key) {
+    if (key) { if (pdHas(key)) return; pdMark(key); }
+    PQ.push(html); pumpPrint();
+  }
+  function pumpPrint() {
+    if (PBUSY || !PQ.length) return;
+    PBUSY = true;
+    var html = PQ.shift();
+    if (DEMO) { paperShow(html); PBUSY = false; setTimeout(pumpPrint, 150); return; }
+    var pa = $('#printarea'); pa.innerHTML = html;
+    setTimeout(function () {
+      try { window.print(); } catch (e) {}
+      setTimeout(function () { pa.innerHTML = ''; PBUSY = false; pumpPrint(); }, 1200); // každý bon = samostatná tisková úloha (tiskárna ho ustřihne)
+    }, 50);
+  }
+  function paperShow(html) { // v demu místo tiskárny náhled papírku
+    var p = $('#paper'); p.hidden = false;
+    if (!p.querySelector('.ph')) p.innerHTML = '<div class="ph"><span>Tiskárna (náhled v demu)</span><button type="button" id="paper_x">Skrýt</button></div><div id="paper_list"></div>';
+    $('#paper_x').onclick = function () { p.hidden = true; };
+    var l = $('#paper_list'); l.insertAdjacentHTML('afterbegin', html);
+  }
+  function printBon(m) { if (PS.on && PS.bony) printJob(bonHtml(m, false), 'k:' + m.id); }
+  function printWatch(S) {
+    if (!PS.on || !S || !S.moves || !AUTH || AUTH.token) return;   // jen tablet/správce na stanici s tiskárnou
+    var list = S.moves.slice().sort(function (a, b) { return a.ts - b.ts; });
+    list.forEach(function (m) {
+      if (m.pending || m.ts < PS.since) return;
+      if (m.typ === 'konzumace') {
+        if (PS.bony && !pdHas('k:' + m.id) && !m.storno) printJob(bonHtml(m, false), 'k:' + m.id);
+        if (PS.storna && m.storno && pdHas('k:' + m.id) && !pdHas('s:' + m.id)) printJob(bonHtml(m, true), 's:' + m.id);
+        if (m.storno && !pdHas('k:' + m.id)) pdMark('k:' + m.id); // zrušené dřív, než se stihlo vytisknout – netisknout vůbec
+      }
+      if (m.typ === 'platba' && PS.uhrady && !m.storno) printJob(payHtml(m), 'p:' + m.id);
+    });
+  }
+  function printSettingsHtml() {
+    return '<section class="sec"><h2>Tiskárna na tomhle počítači</h2><div class="card" style="display:flex;flex-direction:column;gap:10px">' +
+      '<label class="row"><input id="ps_on" type="checkbox"' + (PS.on ? ' checked' : '') + '> <b>Tento počítač je tisková stanice</b> (tiskárna je připojená sem)</label>' +
+      '<div style="padding-left:26px;display:flex;flex-direction:column;gap:8px' + (PS.on ? '' : ';opacity:.5') + '">' +
+      '<label class="row"><input id="ps_bony" type="checkbox"' + (PS.bony ? ' checked' : '') + (PS.on ? '' : ' disabled') + '> Bon pro bar za každé zapsané pití (z mobilu, tabletu i od správce)</label>' +
+      '<label class="row"><input id="ps_storna" type="checkbox"' + (PS.storna ? ' checked' : '') + (PS.on ? '' : ' disabled') + '> Bon „STORNO – NETOČIT“, když se už vytištěné pití zruší</label>' +
+      '<label class="row"><input id="ps_uhrady" type="checkbox"' + (PS.uhrady ? ' checked' : '') + (PS.on ? '' : ' disabled') + '> Potvrzení úhrady při každé zapsané platbě</label>' +
+      '<div class="row"><button class="btn small" id="ps_test"' + (PS.on ? '' : ' disabled') + '>Zkušební bon</button></div></div>' +
+      '<div class="muted" style="font-size:.85rem">Zapni jen na počítači u tiskárny – nastavení platí pro tenhle prohlížeč. Tiskne se jen to, co se zapíše po zapnutí. ' +
+      'Aby bony vyjížděly bez potvrzovacího okna, musí pokladna běžet v Chromu spuštěném s volbou <span class="mono">--kiosk-printing</span>.' + (DEMO ? ' <b>V demu se místo tisku ukáže náhled papírku vpravo dole.</b>' : '') + '</div></div></section>';
+  }
+  function wirePrintSettings() {
+    var on = $('#ps_on'); if (!on) return;
+    on.onchange = function () {
+      PS.on = on.checked; if (PS.on) PS.since = now(); psSave();
+      if (PS.on && ST) ST.moves.forEach(function (m) { pdMark('k:' + m.id); if (m.storno) pdMark('s:' + m.id); if (m.typ === 'platba') pdMark('p:' + m.id); });
+      toast(PS.on ? 'Tisk zapnutý na tomhle počítači' : 'Tisk vypnutý'); renderAdmin();
+    };
+    ['bony', 'storna', 'uhrady'].forEach(function (k) { var c = $('#ps_' + k); if (c) c.onchange = function () { PS[k] = c.checked; psSave(); }; });
+    var t = $('#ps_test'); if (t) t.onclick = function () {
+      var it = ST.items[0] || { nazev: 'Plzeň velká', spotreba: 0.5 };
+      printJob(bonHtml({ id: 'test', ts: now(), ks: 1, polozka: it.nazev, spotreba: it.spotreba, jednotka: (stockOf(it) || {}).jednotka, clen: 'Zkouška', zdroj: 'admin' }, false));
+    };
+  }
+
+  /* ================= DOCHÁZKA (kdo je v Garage) ================= */
+  var KDO = { member: 'mobil', tablet: 'tablet', admin: 'správce' };
+  var JAK = { sam: 'odhlásil se', tablet: 'odhlášen na tabletu', admin: 'odhlásil správce', zavreno: 'zavřeno', automaticky: 'automaticky (2 h nic)' };
+  function pres() { return ST.presence || { otevreno: false, lidi: [] }; }
+  function isHere(id) { return pres().lidi.some(function (l) { return l.id === id; }); }
+  function hereSince(id) { var l = pres().lidi.filter(function (x) { return x.id === id; })[0]; return l ? l.od : 0; }
+  function presenceCard(mode, meId) {
+    var P = pres(), open = P.otevreno, here = meId && isHere(meId);
+    var h = '<div class="pres card' + (open ? ' open' : '') + '"><div class="pres-head"><div class="pres-st"><span class="live' + (open ? ' on' : '') + '"></span><div>' +
+      '<div class="pres-t">' + (open ? 'Otevřeno' : 'Zavřeno') + '</div><div class="muted" style="font-size:.85rem">' +
+      (open ? 'od ' + dt(P.od) + (P.lidi.length ? ' · ' + P.lidi.length + ' ' + plural(P.lidi.length, 'člověk', 'lidi', 'lidí') : ' · nikdo tu teď není') : (P.naposledy ? 'naposledy ' + dt(P.naposledy) : 'zatím nikdo nebyl')) +
+      '</div></div></div><div class="row">';
+    if (mode === 'member') {
+      if (here) h += '<button class="btn" id="pr_out">Odcházím</button>';
+      else if (open) h += '<button class="btn primary" id="pr_in">Jsem tu</button>';
+    } else {
+      h += open ? '<button class="btn" id="pr_close">Zavřít Garage</button>' : '<button class="btn primary" id="pr_open">Otevřít Garage</button>';
+    }
+    h += '</div></div>';
+    if (open && P.lidi.length) h += '<div class="pres-who">' + P.lidi.map(function (l) {
+      return '<span class="who' + (l.id === meId ? ' me' : '') + '">' + esc(l.jmeno) + ' <span class="muted num">od ' + tm(l.od) + '</span></span>';
+    }).join('') + '</div>';
+    if (mode === 'member' && !open) h += '<div class="muted" style="font-size:.82rem;margin-top:8px">Otevře tablet nebo správce, případně první zapsané pití.</div>';
+    if (mode === 'member' && here) h += '<div class="muted" style="font-size:.82rem;margin-top:8px">Když 2 hodiny nic nezapíšeš, odhlásí tě to samo.</div>';
+    return h + '</div>';
+  }
+  function presAct(action, payload, msg) {
+    return api(action, payload || {}).then(function () { sfx('ok'); if (msg) toast(msg); return load().then(renderCurrent); }).catch(fail);
+  }
+  function wirePresence(root, meId, opts) {
+    root = root || app; opts = opts || {};
+    var pay = opts.clenId ? { clenId: opts.clenId } : {};
+    var bind = function (sel, action, payload, msg) {
+      var btn = root.querySelector(sel); if (!btn) return;
+      btn.onclick = function () { btn.disabled = true; presAct(action, payload, msg); };
+    };
+    bind('#pr_in', 'checkin', pay, 'Jsi zapsaný v Garage');
+    bind('#pr_out', 'checkout', pay, 'Odhlášeno. Měj se!');
+    bind('#pr_open', 'setOpen', { otevrit: true }, 'Garage je otevřená');
+    var c = root.querySelector('#pr_close');
+    if (c) c.onclick = function () {
+      if (!c.dataset.sure) { c.dataset.sure = '1'; c.textContent = 'Opravdu zavřít? Všechny odhlásí'; c.classList.add('primary'); return; }
+      c.disabled = true; presAct('setOpen', { otevrit: false }, 'Garage zavřena');
+    };
+  }
+
+  /* ================= ČLEN ================= */
+  function renderMember() {
+    var me = ST.me, tc = todayCounts(ST.moves, me.id);
+    var debt = me.balance < 0 ? -me.balance : 0;
+    var hist = ST.moves.slice(0, 40);
+    app.innerHTML = '<div class="narrow">' +
+      '<div class="hero"><div><div class="eyebrow row" style="gap:6px">' + esc(ST.settings.klub) + sndBtn() + '</div><h1>' + esc(me.jmeno) + '</h1></div>' + balHtml(me.balance, 'balbox') + '</div>' +
+      presenceCard('member', me.id) +
+      tilesHtml(ST.items, tc.c, me.hlavni) +
+      '<div class="row" style="justify-content:space-between;margin-top:8px"><p class="muted" style="font-size:.85rem;margin:0">Ťukni = +1. Překlep jde do 2 minut vrátit.</p>' + favPicker(me.oblibena, true) + '</div>' +
+      '<section class="sec"><div class="sechead"><h2>Dnes</h2><span class="amt num">' + kc(tc.sum) + '</span></div>' +
+      '<p class="note">' + DAY_NOTE + '</p>' +
+      '<div class="card">' + (Object.keys(tc.c).length ? '<div class="list">' + ST.items.filter(function (i) { return tc.c[i.id]; }).map(function (i) {
+        return '<div class="li"><div class="main">' + esc(i.nazev) + '</div><div class="amt num">' + tc.c[i.id] + '×</div></div>';
+      }).join('') + '</div>' : '<div class="muted">Dneska zatím nic.</div>') + '</div></section>' +
+      '<section class="sec"><h2>' + (debt ? 'Zaplatit dluh' : 'Dobít kredit') + '</h2><div class="card">' +
+      '<div class="row" style="margin-bottom:12px"><div class="field" style="flex:1"><label for="payamt">Částka</label>' +
+      '<input id="payamt" type="number" inputmode="numeric" min="1" step="1" value="' + (debt ? Math.ceil(debt) : 500) + '"></div></div>' +
+      '<div id="paybox">' + payBox(debt ? Math.ceil(debt) : 500, me.vs, ST.settings.klub + ' ' + me.jmeno) + '</div>' +
+      '<p class="muted" style="font-size:.85rem;margin:12px 0 0">Platbu převodem nebo hotově zapíše pokladník, pak se ti tu srovná zůstatek.</p></div></section>' +
+      '<section class="sec"><h2>Historie</h2><div class="card"><div class="list">' + (hist.length ? hist.map(function (m) {
+        var t = m.typ === 'platba' ? 'Platba ' + (m.pozn === 'qr' ? 'převodem' : 'hotově') : (m.ks > 1 ? m.ks + '× ' : '') + m.polozka;
+        var a = m.typ === 'platba' ? '<span class="good">+' + kc(m.castka) + '</span>' : '−' + kc(m.castka);
+        return '<div class="li' + (m.storno ? ' storno' : '') + '"><div class="main">' + esc(t) + '<div class="sub">' + dt(m.ts) + (m.zdroj === 'tablet' ? ' · tablet' : '') + '</div></div>' +
+          '<div class="row">' + (m.storno ? '<span class="stlab">' + stornoLab(m) + '</span>' : '') + pendLab(m) + '<span class="amt">' + a + '</span>' + (canUndo(m) ? '<button class="btn small" data-undo="' + esc(m.id) + '">Zpět</button>' : '') + '</div></div>';
+      }).join('') : '<div class="muted">Zatím žádné záznamy.</div>') + '</div></div></section></div>';
+
+    app.querySelectorAll('[data-item]').forEach(function (b) {
+      b.onclick = function () {
+        pulse(b);
+        tapAdd({ polozkaId: b.dataset.item, ks: 1 });
+      };
+    });
+    app.querySelectorAll('[data-undo]').forEach(function (b) { b.onclick = function () { undoMove(b.dataset.undo); }; });
+    wirePresence(app, me.id); wireSnd();
+    var fs = $('#fav_sel');
+    if (fs) fs.onchange = function () { var v = fs.value; fs.blur(); api('setFav', { polozkaId: v }).then(function () { toast(v ? 'Hlavní tlačítko nastaveno' : 'Hlavní tlačítko podle toho, co piješ nejčastěji'); return load().then(renderMember); }).catch(fail); };
+    var inp = $('#payamt');
+    inp.oninput = function () { var v = +inp.value; if (v > 0) $('#paybox').innerHTML = payBox(v, me.vs, ST.settings.klub + ' ' + me.jmeno); };
+  }
+  function undoMove(id, extra) {
+    var qi = -1; Q.forEach(function (q, i) { if (q.p.qid === id) qi = i; });
+    if (qi >= 0) { Q.splice(qi, 1); qSave(); rebuildST(); sfx('undo'); toast('Zrušeno'); if (renderCurrent) renderCurrent(); return Promise.resolve(); }
+    return api('undo', Object.assign({ moveId: id }, extra || {})).then(function () { sfx('undo'); toast('Zrušeno'); return load().then(renderCurrent); }).catch(fail);
+  }
+
+  /* ================= TABLET ================= */
+  var OPEN = null, PIN = '', IDLE = null;
+  function renderTablet() {
+    var s = ST.settings, low = (ST.stocks || []).filter(function (z) { return z.aktivni && z.stav <= z.nizko; });
+    var ms = ST.members.slice().sort(function (a, b) {
+      if ((a.typ === 'host') !== (b.typ === 'host')) return a.typ === 'host' ? 1 : -1;
+      if (isHere(a.id) !== isHere(b.id)) return isHere(a.id) ? -1 : 1;
+      if (!!a.lastTs !== !!b.lastTs) return a.lastTs ? -1 : 1;
+      return a.jmeno.localeCompare(b.jmeno, 'cs');
+    });
+    var debts = ST.members.reduce(function (t, m) { return t + (m.balance < 0 ? -m.balance : 0); }, 0);
+    var tday = ST.members.reduce(function (t, m) { return t + m.dnesKc; }, 0);
+    app.innerHTML = '<div class="wrap"><div class="top"><div><div class="eyebrow">Pokladna</div><h1>' + esc(s.klub) + '</h1></div>' +
+      '<div class="row"><span class="clock num" id="clock"></span>' + sndBtn() + '<button class="btn ghost small" id="toAdmin">Správce</button></div></div>' +
+      presenceCard('tablet') +
+      '<div class="stats"><div><div class="eyebrow">Dnes vypito ' + dayInfo() + '</div><div class="bal num">' + kc(tday) + '</div></div>' +
+      '<div><div class="eyebrow">Dluhy celkem</div><div class="bal num bad">' + kc(debts) + '</div></div></div>' +
+      (low.length ? '<div class="lowbar"><span class="eyebrow" style="align-self:center">Dochází:</span>' + low.map(function (z) { return '<span class="chip">' + esc(z.nazev) + ' · ' + fmtQ(z.stav, z.jednotka) + '</span>'; }).join('') + '</div>' : '') +
+      '<div class="mgrid">' + ms.map(function (m) {
+        return '<button type="button" class="mcard' + (m.lastTs || isHere(m.id) ? ' active' : '') + (m.typ === 'host' ? ' host' : '') + '" data-m="' + esc(m.id) + '">' +
+          '<span class="nm">' + esc(m.jmeno) + (isHere(m.id) ? '<span class="live on sm" title="Je v Garage"></span>' : '') + '</span>' + balHtml(m.balance) +
+          (isHere(m.id) ? '<span class="herechip">tady od ' + tm(hereSince(m.id)) + '</span>' : '') +
+          '<span class="today">' + (m.dnesKs ? 'dnes ' + m.dnesKs + ' ks · ' + kc(m.dnesKc) : '&nbsp;') + '</span></button>';
+      }).join('') + '</div>' +
+      (ST.members.length <= 1 ? '<p class="empty">Zatím je tu jen Host. Členy přidá správce.</p>' : '') + '</div>';
+    tickClock();
+    app.querySelectorAll('[data-m]').forEach(function (b) { b.onclick = function () { openMember(b.dataset.m); }; });
+    $('#toAdmin').onclick = function () { go({ admin: true, t: ROUTE.t }); };
+    wirePresence(app); wireSnd();
+    if (OPEN) renderSheet();
+  }
+  function tickClock() { var c = $('#clock'); if (c) c.textContent = new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }); }
+  setInterval(tickClock, 15000);
+
+  function memberSt(id) { return ST.members.filter(function (m) { return m.id === id; })[0]; }
+  function openMember(id) {
+    var m = memberSt(id); if (!m) return;
+    OPEN = { id: id, ok: true, pin: '' };
+    PIN = ''; renderSheet(); bumpIdle();
+  }
+  function closeSheet() { OPEN = null; sheet.hidden = true; sheet.innerHTML = ''; clearTimeout(IDLE); document.body.style.overflow = ''; }
+  function bumpIdle() { clearTimeout(IDLE); IDLE = setTimeout(closeSheet, 30000); }
+  sheet.addEventListener('pointerdown', bumpIdle);
+
+  function renderSheet() {
+    var m = memberSt(OPEN.id); if (!m) return closeSheet();
+    sheet.hidden = false; document.body.style.overflow = 'hidden';
+    var bar = '<div class="bar"><h2>' + esc(m.jmeno) + '</h2>' + (NET_DOWN ? '<span class="pendlab">bez internetu – ukládá se do tabletu</span>' : '') + '<button class="btn" id="close">← Zpět na přehled</button></div>';
+    if (!OPEN.ok) {
+      sheet.innerHTML = '<div class="narrow">' + bar + '<div class="pin" id="pinbox"><div class="eyebrow">Zadej svůj PIN</div><div class="dots">' +
+        [0, 1, 2, 3].map(function (i) { return '<span class="dot' + (i < PIN.length ? ' on' : '') + '"></span>'; }).join('') + '</div><div class="pad">' +
+        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(function (k) { return k ? '<button type="button" data-k="' + k + '">' + k + '</button>' : '<span></span>'; }).join('') +
+        '</div></div></div>';
+      $('#close').onclick = closeSheet;
+      sheet.querySelectorAll('[data-k]').forEach(function (b) {
+        b.onclick = function () {
+          var k = b.dataset.k;
+          if (k === '⌫') PIN = PIN.slice(0, -1); else if (PIN.length < 4) PIN += k;
+          if (PIN.length === 4) {
+            var p = PIN;
+            api('checkPin', { clenId: m.id, pin: p }).then(function () { OPEN.ok = true; OPEN.pin = p; PIN = ''; renderSheet(); },
+              function (e) { PIN = ''; renderSheet(); var pb = $('#pinbox'); if (pb) pb.classList.add('shake'); fail(e); });
+          }
+          renderSheet();
+        };
+      });
+      return;
+    }
+    var tc = todayCounts(ST.moves, m.id);
+    var mine = ST.moves.filter(function (x) { return x.clenId === m.id && x.typ === 'konzumace' && x.ts >= startToday(); }).slice(0, 12);
+    var host = m.typ === 'host', owe = m.balance < 0 ? -m.balance : 0;
+    if (!host) bar = bar.replace('<button class="btn" id="close">', (isHere(m.id) ? '<span class="herechip">tady od ' + tm(hereSince(m.id)) + '</span><button class="btn" id="sh_out">Odchází</button>' : '<button class="btn" id="sh_in">Je tu</button>') + '<button class="btn" id="close">');
+    sheet.innerHTML = '<div class="wrap">' + bar +
+      '<div class="row" style="justify-content:space-between;margin-bottom:14px">' + balHtml(m.balance) +
+      '<div style="text-align:right"><div class="eyebrow">Dnes ' + dayInfo() + '</div><div class="bal num" style="font-size:1.4rem">' + kc(tc.sum) + '</div></div></div>' +
+      tilesHtml(ST.items, tc.c, m.hlavni) +
+      (host && owe ? '<section class="sec"><h2>Host platí</h2><div class="card">' + payBox(owe, '', ST.settings.klub + ' host') +
+        '<p class="muted" style="font-size:.85rem;margin:12px 0 0">Platbu zapíše správce.</p></div></section>' : '') +
+      '<section class="sec"><h2>Dnešní zápisy</h2><div class="card"><div class="list">' + (mine.length ? mine.map(function (x) {
+        return '<div class="li' + (x.storno ? ' storno' : '') + '"><div class="main">' + esc(x.polozka) + '<div class="sub">' + tm(x.ts) + '</div></div><div class="row">' + (x.storno ? '<span class="stlab">' + stornoLab(x) + '</span>' : '') + pendLab(x) + '<span class="amt">' + kc(x.castka) + '</span>' +
+          (canUndo(x) ? '<button class="btn small" data-undo="' + esc(x.id) + '">Zpět</button>' : '') + '</div></div>';
+      }).join('') : '<div class="muted">Dneska zatím nic.</div>') + '</div></div></section></div>';
+    $('#close').onclick = closeSheet;
+    var si = $('#sh_in'), so = $('#sh_out');
+    if (si) si.onclick = function () { si.disabled = true; presAct('checkin', { clenId: m.id }, m.jmeno + ' je v Garage'); };
+    if (so) so.onclick = function () { so.disabled = true; presAct('checkout', { clenId: m.id }, m.jmeno + ' odhlášen'); };
+    sheet.querySelectorAll('[data-item]').forEach(function (b) {
+      b.onclick = function () {
+        pulse(b);
+        tapAdd({ clenId: m.id, polozkaId: b.dataset.item, ks: 1 }, m.jmeno);
+      };
+    });
+    sheet.querySelectorAll('[data-undo]').forEach(function (b) { b.onclick = function () { undoMove(b.dataset.undo, { pin: OPEN.pin }); }; });
+  }
+
+  /* ================= SPRÁVCE ================= */
+  var TAB = 'clenove', EXP = {};
+  function renderAdminLogin(errMsg) {
+    clearInterval(POLL);
+    app.innerHTML = '<div class="narrow"><div class="top"><h1>Správce pokladny</h1>' + (ROUTE.fromTablet ? '<button class="btn ghost small" id="back">Zpět na tablet</button>' : '') + '</div>' +
+      '<form id="lf" class="card" style="display:flex;flex-direction:column;gap:12px"><div class="field"><label for="apin">PIN správce</label>' +
+      '<input id="apin" type="password" inputmode="numeric" autocomplete="off"></div>' + (errMsg ? '<div class="bad">' + esc(errMsg) + '</div>' : '') +
+      '<button class="btn primary" type="submit">Přihlásit</button>' + (DEMO ? '<div class="muted">V demu je PIN 1234.</div>' : '') + '</form></div>';
+    var b = $('#back'); if (b) b.onclick = function () { go({ t: ROUTE.t }); };
+    $('#apin').focus();
+    $('#lf').onsubmit = function (e) {
+      e.preventDefault();
+      var p = $('#apin').value.trim(); AUTH = { admin: p };
+      load().then(function () { ss('pk_admin', p); renderAdmin(); poll(PS.on ? 10000 : 30000, adminPoll); }, function (er) { AUTH = null; renderAdminLogin(er.message); });
+    };
+  }
+  function renderAdmin() {
+    if (PEND && TAB === 'pohyby' && arguments[0] === 'poll') return; // nepřekreslovat během potvrzování storna
+    var focusId = document.activeElement && document.activeElement.id;
+    if (focusId && /^(f_|n_|i_|s_|pay_|mf_|z_|add_|vf_|sr_|fav_)/.test(focusId)) return; // nepřepisovat rozepsaný formulář při obnově
+    var tabs = [['clenove', 'Členové'], ['navstevy', 'Docházka'], ['sklad', 'Sklad'], ['polozky', 'Položky'], ['pohyby', 'Pohyby'], ['nastaveni', 'Nastavení']];
+    app.innerHTML = '<div class="wrap"><div class="top"><div><div class="eyebrow">Správce</div><h1>' + esc(ST.settings.klub) + '</h1></div>' +
+      '<div class="row">' + (ROUTE.fromTablet ? '<button class="btn ghost small" id="back">Zpět na tablet</button>' : '') + '<button class="btn ghost small" id="logout">Odhlásit</button></div></div>' +
+      '<div class="tabs">' + tabs.map(function (t) { return '<button class="tab' + (TAB === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<div id="tabbody"></div></div>';
+    app.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { TAB = b.dataset.tab; EXP = {}; PEND = null; renderAdmin(); }; });
+    var b = $('#back'); if (b) b.onclick = function () { go({ t: ROUTE.t }); };
+    $('#logout').onclick = function () { ss('pk_admin', null); AUTH = null; renderAdminLogin(); };
+    ({ clenove: admMembers, navstevy: admVisits, sklad: admStock, polozky: admItems, pohyby: admMoves, nastaveni: admSettings })[TAB]($('#tabbody'));
+  }
+  function adminPoll() { renderAdmin('poll'); }
+  function reAdm() { return load().then(renderAdmin); }
+  // v demu vede QR na zkušební stránku v Claude s #kódem člena (query string se tam nepředává); po nasazení klasicky ?m=
+  var DEMO_LINK = 'https://claude.ai/artifact/R1WxsK3ydKtgVmiHZtrzNV';
+  function linkFor(m) { return DEMO ? DEMO_LINK + '#' + m.token : BASE + '?m=' + encodeURIComponent(m.token); }
+
+  function admMembers(el) {
+    var ms = ST.members.filter(function (m) { return m.typ !== 'host'; }).sort(function (a, b) { return a.jmeno.localeCompare(b.jmeno, 'cs'); });
+    var host = ST.members.filter(function (m) { return m.typ === 'host'; });
+    var dl = ST.members.reduce(function (t, m) { return t + (m.balance < 0 ? -m.balance : 0); }, 0);
+    var kr = ST.members.reduce(function (t, m) { return t + (m.balance > 0 ? m.balance : 0); }, 0);
+    el.innerHTML = '<div class="stats"><div><div class="eyebrow">Dluží celkem</div><div class="bal bad">' + kc(dl) + '</div></div>' +
+      '<div><div class="eyebrow">Předplaceno celkem</div><div class="bal good">' + kc(kr) + '</div></div></div>' +
+      '<form id="addm" class="card row" style="margin-bottom:16px"><div class="field" style="flex:2 1 180px"><label for="n_jm">Nový člen</label><input id="n_jm" type="text" placeholder="Jméno nebo přezdívka"></div>' +
+      '<button class="btn primary" type="submit" style="align-self:flex-end">Přidat</button></form>' +
+      '<div class="card">' + (ms.length ? ms.concat(host).map(memberRow).join('') : '<div class="muted">Zatím žádní členové. Přidej prvního nahoře.</div>' + host.map(memberRow).join('')) + '</div>';
+    $('#addm').onsubmit = function (e) {
+      e.preventDefault();
+      api('saveMember', { jmeno: $('#n_jm').value }).then(function (r) { EXP = {}; EXP[r.id] = 'link'; toast('Člen přidán – pošli mu odkaz'); document.activeElement.blur(); return reAdm(); }).catch(fail);
+    };
+    el.querySelectorAll('[data-x]').forEach(function (b) {
+      b.onclick = function () { var id = b.dataset.id, x = b.dataset.x; EXP = EXP[id] === x ? {} : (function () { var o = {}; o[id] = x; return o; })(); renderAdmin(); };
+    });
+    ms.concat(host).forEach(function (m) { if (EXP[m.id]) wirePanel(m); });
+  }
+  function memberRow(m) {
+    var host = m.typ === 'host', x = EXP[m.id];
+    var h = '<div class="adm-item"><div class="adm-head"><div class="main"><div style="font-weight:600;font-size:1.1rem">' + esc(m.jmeno) +
+      (!m.aktivni ? ' <span class="chip">neaktivní</span>' : '') + (host ? ' <span class="chip">host</span>' : '') + '</div>' +
+      '<div class="sub muted" style="font-size:.85rem">' + (host ? 'Společný účet pro hosty' : 'VS ' + esc(m.vs)) + '</div></div>' +
+      '<div class="row">' + balHtml(m.balance) + '</div></div><div class="row" style="margin-top:10px">' +
+      '<button class="btn small' + (x === 'add' ? ' primary' : '') + '" data-x="add" data-id="' + m.id + '">Zapsat útratu</button>' +
+      '<button class="btn small' + (x === 'pay' ? ' primary' : '') + '" data-x="pay" data-id="' + m.id + '">Přijmout platbu</button>' +
+      (host ? '' : '<button class="btn small' + (x === 'link' ? ' primary' : '') + '" data-x="link" data-id="' + m.id + '">Přihlašovací QR</button>') +
+      (host ? '' : '<button class="btn small' + (x === 'edit' ? ' primary' : '') + '" data-x="edit" data-id="' + m.id + '">Upravit</button>') + '</div>';
+    if (x === 'add') {
+      h += '<div class="adm-panel"><div class="row"><div class="field" style="width:120px"><label for="add_ks">Počet</label><input id="add_ks" type="number" inputmode="numeric" min="1" max="20" value="1"></div>' +
+        '<span class="muted" style="align-self:flex-end;font-size:.85rem;padding-bottom:10px">Nastav počet a ťukni na položku.</span></div>' +
+        '<div class="addgrid">' + ST.items.filter(function (i) { return i.aktivni; }).map(function (i) {
+          return '<button type="button" class="btn" data-add="' + i.id + '"><span style="display:block">' + esc(i.nazev) + '</span><span class="muted num" style="font-size:.85rem">' + kc(i.cena) + '</span></button>';
+        }).join('') + '</div></div>';
+    }
+    if (x === 'pay') {
+      var d = m.balance < 0 ? Math.ceil(-m.balance) : 500;
+      h += '<div class="adm-panel"><div class="grid2"><div class="field"><label for="pay_amt">Částka</label><input id="pay_amt" type="number" inputmode="numeric" min="1" value="' + d + '"></div>' +
+        '<div class="field"><label for="pay_zp">Způsob</label><select id="pay_zp"><option value="hotove">Hotově</option><option value="qr">QR / převodem</option></select></div></div>' +
+        '<div id="pay_qr" hidden></div><div class="row"><button class="btn primary" id="pay_ok">Zapsat platbu</button><span class="muted" style="font-size:.85rem">Kladná částka sníží dluh nebo navýší kredit.</span></div></div>';
+    }
+    if (x === 'link') {
+      var u = linkFor(m);
+      h += '<div class="adm-panel"><div class="qrbox"><div class="qr">' + qrSvg(u) + '</div><div class="qrinfo"><div class="eyebrow">Osobní odkaz – pošli jen jemu</div>' +
+        '<div class="row"><button class="btn small primary" data-qrbig="' + m.id + '">Ukázat QR na celou obrazovku</button>' +
+        '<button class="btn small" data-qrprint="' + m.id + '"' + (PS.on ? '' : ' disabled title="Zapni tiskovou stanici v Nastavení"') + '>Vytisknout QR na tiskárně</button></div>' +
+        '<div class="mono">' + esc(u) + '</div><div class="row"><button class="btn small" data-copy="' + esc(u) + '">Kopírovat odkaz</button>' +
+        (DEMO ? '<button class="btn small" data-demo-open="' + esc(m.token) + '">Otevřít v demu</button>' : '<a class="btn small" href="' + esc(u) + '" target="_blank" rel="noopener">Otevřít</a>') + '</div>' +
+        '<div class="muted" style="font-size:.85rem">Člen naskenuje QR fotoaparátem mobilu, otevře odkaz a dá Sdílet → Přidat na plochu. Pak to funguje jako appka.' + (PS.on ? '' : ' Tisk QR jde, až bude tento počítač tisková stanice (Nastavení).') + '</div></div></div></div>';
+    }
+    if (x === 'edit') {
+      h += '<div class="adm-panel"><div class="grid2"><div class="field"><label for="f_jm">Jméno</label><input id="f_jm" type="text" value="' + esc(m.jmeno) + '"></div>' +
+        '</div>' +
+        '<div class="field" style="max-width:320px"><label for="f_fav">Hlavní tlačítko</label><select id="f_fav"><option value="">Automaticky (nejčastější)</option>' +
+          ST.items.map(function (i) { return '<option value="' + i.id + '"' + (m.oblibena === i.id ? ' selected' : '') + '>' + esc(i.nazev) + '</option>'; }).join('') + '</select></div>' +
+        '<label class="row"><input id="f_akt" type="checkbox"' + (m.aktivni ? ' checked' : '') + '> Aktivní člen</label>' +
+        '<label class="row"><input id="f_tok" type="checkbox"> Vygenerovat nový odkaz (starý přestane fungovat)</label>' +
+        '<div><button class="btn primary" id="f_ok">Uložit</button></div></div>';
+    }
+    return h + '</div>';
+  }
+  function loginQrHtml(m) {
+    return '<div class="bon"><div class="bh">PŘIHLÁŠENÍ DO POKLADNY</div><div class="ctr">' + esc(ST.settings.klub) + '</div>' +
+      '<div class="big ctr">' + esc(m.jmeno) + '</div><div class="bonqr">' + qrSvg(linkFor(m)) + '</div>' +
+      '<div class="ctr">Naskenuj fotoaparátem mobilu,<br>otevři odkaz a ulož si ho na plochu<br>(Sdílet → Přidat na plochu).</div>' +
+      '<div class="sep"></div><div class="ctr">Osobní – nedávej ho nikomu dalšímu.</div></div>';
+  }
+  function showQrBig(m) {
+    var o = document.createElement('div'); o.className = 'qrfull'; o.setAttribute('role', 'dialog');
+    o.innerHTML = '<div class="qrfull-in"><div class="eyebrow">' + esc(ST.settings.klub) + ' · přihlášení</div><h2>' + esc(m.jmeno) + '</h2>' +
+      '<div class="qrbigbox">' + qrSvg(linkFor(m)) + '</div><p class="muted">Naskenuj fotoaparátem mobilu a ulož si odkaz na plochu.</p>' +
+      '<button class="btn primary" type="button">Hotovo</button></div>';
+    document.body.appendChild(o);
+    var close = function () { o.remove(); };
+    o.querySelector('button').onclick = close; o.onclick = function (e) { if (e.target === o) close(); };
+  }
+  function wirePanel(m) {
+    var x = EXP[m.id];
+    if (x === 'add') {
+      app.querySelectorAll('[data-add]').forEach(function (b) {
+        b.onclick = function () {
+          var ks = Math.round(+$('#add_ks').value || 1), it = ST.items.filter(function (i) { return i.id === b.dataset.add; })[0];
+          b.disabled = true;
+          api('add', { clenId: m.id, polozkaId: b.dataset.add, ks: ks }).then(function (r) {
+            toast(m.jmeno + ': ' + (ks > 1 ? ks + '× ' : '') + it.nazev + ' zapsáno', { action: 'Zpět', fn: function () { undoMove(r.move.id); }, ms: 6000 });
+            return reAdm();
+          }).catch(function (e) { b.disabled = false; fail(e); });
+        };
+      });
+    }
+    if (x === 'pay') {
+      var upd = function () {
+        var q = $('#pay_qr'); if (!q) return;
+        q.hidden = $('#pay_zp').value !== 'qr';
+        if (!q.hidden) q.innerHTML = payBox(+$('#pay_amt').value || 0, m.vs, ST.settings.klub + ' ' + m.jmeno);
+      };
+      $('#pay_zp').onchange = upd; $('#pay_amt').oninput = upd;
+      $('#pay_ok').onclick = function () {
+        var amt = +$('#pay_amt').value, zp = $('#pay_zp').value;
+        this.disabled = true;
+        api('pay', { clenId: m.id, castka: amt, zpusob: zp }).then(function () { toast(m.jmeno + ': platba ' + kc(amt) + ' zapsána'); EXP = {}; document.activeElement.blur(); return reAdm(); }).catch(function (e) { $('#pay_ok').disabled = false; fail(e); });
+      };
+    }
+    if (x === 'edit') {
+      $('#f_ok').onclick = function () {
+        var fav = $('#f_fav').value;
+        api('saveMember', { id: m.id, jmeno: $('#f_jm').value, aktivni: $('#f_akt').checked, novyOdkaz: $('#f_tok').checked })
+          .then(function () { return fav !== (m.oblibena || '') ? api('setFav', { clenId: m.id, polozkaId: fav }) : null; })
+          .then(function () { toast('Uloženo'); EXP = {}; document.activeElement.blur(); return reAdm(); }).catch(fail);
+      };
+    }
+    app.querySelectorAll('[data-copy]').forEach(function (b) { b.onclick = function () { copy(b.dataset.copy, b); }; });
+    app.querySelectorAll('[data-qrbig]').forEach(function (b) { b.onclick = function () { showQrBig(m); }; });
+    app.querySelectorAll('[data-qrprint]').forEach(function (b) { b.onclick = function () { printJob(loginQrHtml(m)); sfx('ok'); toast('Tisknu přihlašovací QR pro ' + m.jmeno); }; });
+    app.querySelectorAll('[data-demo-open]').forEach(function (b) { b.onclick = function () { go({ m: b.dataset.demoOpen }); }; });
+  }
+
+  /* ---------- docházka: historie pro správce ---------- */
+  var VF = { obdobi: '7d', clen: '' };
+  function dur(ms) { var m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60); return (h ? h + ' h ' : '') + (m % 60) + ' min'; }
+  function admVisits(el) {
+    var per = periodStart(VF.obdobi), nowT = now();
+    var vs = (ST.visits || []).filter(function (v) { return v.od >= per[0] && v.od < per[1] && (!VF.clen || v.clenId === VF.clen) && (!VF.clen || v.typ === 'clen'); });
+    var sum = {};
+    vs.forEach(function (v) { if (v.typ !== 'clen') return; var x = sum[v.clenId] = sum[v.clenId] || { jmeno: v.jmeno, n: 0, t: 0 }; x.n++; x.t += (v.do || nowT) - v.od; });
+    var sumRows = Object.keys(sum).map(function (k) { return sum[k]; }).sort(function (a, b) { return b.t - a.t; });
+    var opens = vs.filter(function (v) { return v.typ === 'garaz'; });
+    el.innerHTML = presenceCard('tablet') +
+      '<div class="card filters" style="margin-top:16px">' +
+      sel('vf_obdobi', 'Období', VF.obdobi, [['dnes', 'Dnes (od 6:00)'], ['7d', 'Posledních 7 dní'], ['mesic', 'Tento měsíc'], ['minuly', 'Minulý měsíc'], ['', 'Vše']]) +
+      sel('vf_clen', 'Kdo', VF.clen, [['', 'Všichni']].concat(ST.members.filter(function (m) { return m.typ !== 'host'; }).sort(function (a, b) { return a.jmeno.localeCompare(b.jmeno, 'cs'); }).map(function (m) { return [m.id, m.jmeno]; }))) +
+      '</div>' +
+      '<div class="stats" style="margin:14px 0"><div><div class="eyebrow">Otevřeno</div><div class="bal num">' + opens.length + '× </div><div class="muted num" style="font-size:.85rem">celkem ' + dur(opens.reduce(function (t, v) { return t + (v.do || nowT) - v.od; }, 0)) + '</div></div>' +
+      '<div><div class="eyebrow">Návštěv</div><div class="bal num">' + vs.filter(function (v) { return v.typ === 'clen'; }).length + '</div></div></div>' +
+      (sumRows.length ? '<section><h2 style="margin-bottom:10px">Kdo tu byl</h2><div class="card tablewrap"><table><thead><tr><th>Kdo</th><th>Návštěv</th><th>Čas celkem</th></tr></thead><tbody>' +
+        sumRows.map(function (x) { return '<tr><td><b>' + esc(x.jmeno) + '</b></td><td class="num">' + x.n + '</td><td class="num">' + dur(x.t) + '</td></tr>'; }).join('') + '</tbody></table></div></section>' : '') +
+      '<section class="sec"><h2 style="margin-bottom:10px">Historie</h2><div class="card tablewrap"><table><thead><tr><th>Kdo</th><th>Příchod</th><th>Odchod</th><th>Délka</th><th>Jak odešel / zavřeno</th><th>Zapsal</th></tr></thead><tbody>' +
+      (vs.length ? vs.map(function (v) {
+        var g = v.typ === 'garaz';
+        return '<tr class="' + (g ? 'garow' : '') + '"><td>' + (g ? '<b>Garage otevřena</b>' : esc(v.jmeno)) + '</td><td class="num">' + dt(v.od) + '</td>' +
+          '<td class="num">' + (v.do ? dt(v.do) + (v.jak === 'automaticky' ? ' <span class="muted">(asi)</span>' : '') : '<span class="good">' + (g ? 'otevřeno' : 'je tu') + '</span>') + '</td>' +
+          '<td class="num">' + dur((v.do || nowT) - v.od) + '</td>' +
+          '<td class="muted">' + (v.do ? (g ? (v.jak === 'automaticky' ? 'samo (2 h nikdo)' : 'zavřel ' + (KDO[v.jak] || v.jak)) : (JAK[v.jak] || v.jak)) : '') + '</td>' +
+          '<td class="muted">' + (g ? 'otevřel ' : '') + (KDO[v.kdo] || v.kdo) + '</td></tr>';
+      }).join('') : '<tr><td colspan="6" class="muted">V tomto období tu nikdo nebyl.</td></tr>') + '</tbody></table></div>' +
+      '<p class="muted" style="font-size:.85rem;margin:8px 0 0">„(asi)“ = člověk se neodhlásil, odchod je odhadnutý 2 hodiny po jeho posledním pití nebo ťuknutí „Jsem tu“.</p></section>';
+    wirePresence(el);
+    $('#vf_obdobi').onchange = function () { VF.obdobi = this.value; this.blur(); renderAdmin(); };
+    $('#vf_clen').onchange = function () { VF.clen = this.value; this.blur(); renderAdmin(); };
+  }
+
+  /* ---------- sklad: zásoby (pivo v litrech po sudech, ostatní v kusech) ---------- */
+  var SPER = 'mesic';
+  function zOpts(sel) {
+    return '<option value="">Bez skladu</option>' + ST.stocks.map(function (z) { return '<option value="' + z.id + '"' + (sel === z.id ? ' selected' : '') + '>' + esc(z.nazev) + ' (' + z.jednotka + ')</option>'; }).join('');
+  }
+  var KEGS = [15, 30, 50];
+  function sizeChips(target, cur) {
+    var std = KEGS.indexOf(+cur) >= 0;
+    return '<div class="row" style="margin-top:6px">' + KEGS.map(function (v) {
+      return '<button type="button" class="btn small' + (+cur === v ? ' primary' : '') + '" data-chip="' + target + '" data-size="' + v + '">' + v + ' l</button>';
+    }).join('') + '<button type="button" class="btn small' + (std ? '' : ' primary') + '" data-chip="' + target + '" data-size="">jiné</button></div>';
+  }
+  function obalText(z, n) {
+    var o = z.obal || 'bal.';
+    if (o === 'sud') o = n % 1 ? 'sudu' : n === 1 ? 'sud' : (n > 1 && n < 5) ? 'sudy' : 'sudů';
+    return fmtNum(n) + '\u00a0' + o;
+  }
+  function admStock(el) {
+    var per = periodStart(SPER), agg = {};
+    ST.stocks.forEach(function (z) { agg[z.id] = { out: 0, inn: 0, inv: 0, items: {} }; });
+    ST.moves.forEach(function (m) {
+      var a = agg[m.zasobaId]; if (m.storno || !a || m.ts < per[0] || m.ts >= per[1]) return;
+      if (m.typ === 'konzumace') { a.out += m.mnozstvi; a.items[m.polozka] = (a.items[m.polozka] || 0) + m.ks; }
+      else if (m.typ === 'naskladneni') { if (m.pozn === 'inventura') a.inv += m.mnozstvi; else a.inn += m.mnozstvi; }
+    });
+    var stockRow = function (z) {
+      var x = EXP[z.id], low = z.stav <= z.nizko, keg = z.baleni > 1;
+      var sells = ST.items.filter(function (i) { return i.zasobaId === z.id; });
+      var h = '<div class="adm-item"><div class="adm-head"><div class="main"><div style="font-weight:600;font-size:1.1rem">' + esc(z.nazev) + (z.aktivni ? '' : ' <span class="chip">skrytá</span>') + '</div>' +
+        '<div class="muted" style="font-size:.85rem">' + (keg ? (z.jednotka === 'l' ? 'obvyklý sud ' : esc(z.obal) + ' = ') + fmtQ(z.baleni, z.jednotka) + ' · ' : '') + 'upozornit pod ' + fmtQ(z.nizko, z.jednotka) + '</div>' +
+        '<div style="font-size:.85rem;margin-top:4px">' + (sells.length ? '<span class="muted">Prodává se jako:</span> ' + sells.map(function (i) { return esc(i.nazev) + ' <span class="muted">(' + (z.jednotka === 'l' ? fmtQ(i.spotreba, 'l') + ' · ' : '') + kc(i.cena) + ')</span>'; }).join(', ') : '<span class="warn">Zatím se neprodává – přidej položku v Položkách.</span>') + '</div></div>' +
+        '<div style="text-align:right"><div class="eyebrow">Na skladě</div><div class="bal num ' + (z.stav <= 0 ? 'bad' : low ? 'warn' : '') + '" style="font-size:1.6rem">' + fmtQ(z.stav, z.jednotka) + '</div>' +
+        '</div></div>' +
+        '<div class="row" style="margin-top:10px">' +
+        [['in', 'Naskladnit'], ['inv', 'Inventura'], ['edit', 'Upravit'], ['del', 'Smazat']].map(function (v) { return '<button class="btn small' + (x === v[0] ? ' primary' : '') + '" data-zx="' + v[0] + '" data-id="' + z.id + '">' + v[1] + '</button>'; }).join('') + '</div>';
+      if (x === 'in') h += z.jednotka === 'l'
+        ? '<div class="adm-panel"><div class="field"><label>Velikost sudu</label>' + sizeChips('z_size', z.baleni) + '</div>' +
+          '<div class="grid2"><div class="field"><label for="z_size">Litrů v jednom sudu</label><input id="z_size" type="text" inputmode="decimal" value="' + fmtNum(z.baleni) + '"></div>' +
+          '<div class="field"><label for="z_bal">Počet sudů</label><input id="z_bal" type="text" inputmode="numeric" value="1"></div></div>' +
+          '<div><button class="btn primary" id="z_ok">Naskladnit</button></div></div>'
+        : '<div class="adm-panel"><div class="grid2">' +
+          (keg ? '<div class="field"><label for="z_bal">Počet (' + esc(z.obal) + ' po ' + fmtQ(z.baleni, z.jednotka) + ')</label><input id="z_bal" type="text" inputmode="decimal" value="1"></div>' : '') +
+          '<div class="field"><label for="z_mn">' + (keg ? 'nebo přesně' : 'Přivezeno') + ' (' + z.jednotka + ')</label><input id="z_mn" type="text" inputmode="decimal" placeholder="např. 24"></div></div>' +
+          '<div><button class="btn primary" id="z_ok">Naskladnit</button></div></div>';
+      if (x === 'inv') h += '<div class="adm-panel"><div class="field"><label for="z_inv">Skutečný stav (' + z.jednotka + ')</label><input id="z_inv" type="text" inputmode="decimal" placeholder="' + fmtNum(z.stav) + '"></div>' +
+        '<div class="muted" style="font-size:.85rem">' + (z.jednotka === 'l' ? 'U sudu stačí odhad zbytku. ' : '') + 'Rozdíl proti evidenci se zapíše jako inventurní rozdíl a uvidíš ho ve spotřebě.</div>' +
+        '<div><button class="btn primary" id="z_ok">Uložit stav</button></div></div>';
+      if (x === 'del') {
+        var linked = ST.items.filter(function (i) { return i.zasobaId === z.id; }).map(function (i) { return esc(i.nazev); });
+        h += '<div class="adm-panel confirm" style="background:var(--bg);flex-direction:row;margin-top:12px"><div><div class="eyebrow bad">Opravdu smazat zásobu „' + esc(z.nazev) + '“?</div>' +
+          '<div class="muted" style="font-size:.85rem;margin-top:4px">' + (linked.length ? 'Položky ' + linked.join(', ') + ' přestanou odepisovat ze skladu (v nabídce zůstanou). ' : '') +
+          'Historie pohybů zůstane zachovaná.</div></div>' +
+          '<div class="row"><button class="btn primary" id="z_ok">Ano, smazat</button><button class="btn" id="z_no">Ne</button></div></div>';
+      }
+      if (x === 'edit') h += '<div class="adm-panel"><div class="grid2">' +
+        '<div class="field"><label for="z_n">Název</label><input id="z_n" type="text" value="' + esc(z.nazev) + '"></div>' +
+        '<div class="field"><label for="z_j">Jednotka</label><select id="z_j"><option value="l"' + (z.jednotka === 'l' ? ' selected' : '') + '>litry</option><option value="ks"' + (z.jednotka === 'ks' ? ' selected' : '') + '>kusy</option></select></div>' +
+        '<div class="field"><label for="z_b">' + (z.jednotka === 'l' ? 'Obvyklá velikost sudu (l)' : 'Velikost balení (ks)') + '</label><input id="z_b" type="text" inputmode="decimal" value="' + fmtNum(z.baleni) + '">' +
+          (z.jednotka === 'l' ? sizeChips('z_b', z.baleni) : '') + '</div>' +
+        '<div class="field"><label for="z_o">Název balení</label><input id="z_o" type="text" value="' + esc(z.obal) + '" placeholder="sud, bedna…"></div>' +
+        '<div class="field"><label for="z_lo">Upozornit pod (' + z.jednotka + ')</label><input id="z_lo" type="text" inputmode="decimal" value="' + fmtNum(z.nizko) + '"></div></div>' +
+        '<label class="row"><input id="z_a" type="checkbox"' + (z.aktivni ? ' checked' : '') + '> Aktivní</label>' +
+        '<div><button class="btn primary" id="z_ok">Uložit</button></div></div>';
+      return h + '</div>';
+    };
+    var perOpts = [['dnes', 'Dnes (od 6:00)'], ['7d', 'Posledních 7 dní'], ['mesic', 'Tento měsíc'], ['minuly', 'Minulý měsíc'], ['', 'Od začátku']];
+    var used = ST.stocks.filter(function (z) { var a = agg[z.id]; return a.out || a.inn || a.inv; });
+    el.innerHTML =
+      '<section><div class="sechead" style="align-items:flex-end"><h2>Spotřeba</h2><div style="min-width:190px">' + sel('z_per', 'Období', SPER, perOpts) + '</div></div>' +
+      '<div class="card tablewrap"><table><thead><tr><th>Zásoba</th><th>Spotřeba</th><th>Prodáno</th><th>Naskladněno</th><th>Inventurní rozdíl</th></tr></thead><tbody>' +
+      (used.length ? used.map(function (z) {
+        var a = agg[z.id], keg = z.baleni > 1;
+        return '<tr><td><b>' + esc(z.nazev) + '</b></td><td class="num"><b>' + fmtQ(a.out, z.jednotka) + '</b>' + '' + '</td>' +
+          '<td>' + Object.keys(a.items).map(function (k) { return esc(k) + ' <b class="num">' + a.items[k] + '×</b>'; }).join(', ') + '</td>' +
+          '<td class="num">' + (a.inn ? '+' + fmtQ(a.inn, z.jednotka) : '') + '</td>' +
+          '<td class="num ' + (a.inv < 0 ? 'bad' : a.inv > 0 ? 'good' : '') + '">' + (a.inv ? (a.inv > 0 ? '+' : '−') + fmtQ(Math.abs(a.inv), z.jednotka) : '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" class="muted">V tomto období žádný pohyb.</td></tr>') + '</tbody></table></div>' +
+      '<p class="muted" style="font-size:.85rem;margin:8px 0 0">Inventurní rozdíl v minusu znamená, že chybí víc, než se zapsalo (pěna, rozlité, nezapsané).</p></section>' +
+      '<section class="sec"><h2>Stav zásob</h2>' +
+      '<form id="addz" class="card" style="margin-bottom:12px"><div class="row"><div class="field" style="flex:2 1 180px"><label for="n_zn">Nová zásoba</label><input id="n_zn" type="text" placeholder="Např. Kozel – sud" autocomplete="off"></div>' +
+      '<div class="field" style="flex:1 1 100px"><label for="n_zj">Jednotka</label><select id="n_zj"><option value="l">litry (sudové)</option><option value="ks">kusy</option></select></div>' +
+      '<div class="field" style="flex:1 1 110px" id="n_zbw"><label for="n_zb">Obvyklý sud (l)</label><input id="n_zb" type="text" inputmode="decimal" placeholder="15"></div></div>' +
+      '<div class="eyebrow" style="margin:14px 0 6px">Prodávat jako (objeví se v Položkách a na tabletu)</div><div id="n_rows" class="sellrows"></div>' +
+      '<div class="muted" style="font-size:.82rem;margin:6px 0 10px">Řádek bez názvu se nevytvoří. Ceny i názvy jde později změnit v Položkách.</div>' +
+      '<button class="btn primary" type="submit">Přidat zásobu a položky</button></form>' +
+      '<div class="card">' + (ST.stocks.length ? ST.stocks.map(stockRow).join('') : '<div class="muted">Zatím žádné zásoby.</div>') + '</div></section>';
+    $('#z_per').onchange = function () { SPER = this.value; this.blur(); renderAdmin(); };
+    var baseName = function (n) { return String(n || '').replace(/\s*[–-]?\s*sud\s*$/i, '').trim(); };
+    var rowsTouched = false;
+    var sellRow = function (k, nazev, objem, cena, jed) {
+      return '<div class="sellrow"><div class="field"><label for="sr_n' + k + '">Název</label><input id="sr_n' + k + '" type="text" value="' + esc(nazev) + '" data-sr="n"></div>' +
+        (jed === 'l' ? '<div class="field"><label for="sr_o' + k + '">Objem (l)</label><input id="sr_o' + k + '" type="text" inputmode="decimal" value="' + objem + '" data-sr="o"></div>' : '') +
+        '<div class="field"><label for="sr_c' + k + '">Cena Kč</label><input id="sr_c' + k + '" type="text" inputmode="decimal" value="' + cena + '" data-sr="c"></div></div>';
+    };
+    var drawRows = function () {
+      var jed = $('#n_zj').value, b = baseName($('#n_zn').value) || (jed === 'l' ? 'Pivo' : '');
+      $('#n_zbw').hidden = jed !== 'l';
+      $('#n_rows').innerHTML = jed === 'l' ? sellRow(0, b + ' velké', '0,5', '50', 'l') + sellRow(1, b + ' malé', '0,3', '35', 'l') : sellRow(0, b, '', '', 'ks');
+      $('#n_rows').querySelectorAll('input').forEach(function (i) { i.addEventListener('input', function () { rowsTouched = true; }); });
+    };
+    drawRows();
+    $('#n_zj').onchange = function () { rowsTouched = false; drawRows(); };
+    $('#n_zn').oninput = function () {
+      if (rowsTouched) return;
+      var jed = $('#n_zj').value, b = baseName(this.value);
+      if (jed === 'l') { $('#sr_n0').value = (b || 'Pivo') + ' velké'; $('#sr_n1').value = (b || 'Pivo') + ' malé'; } else $('#sr_n0').value = this.value.trim();
+    };
+    $('#addz').onsubmit = function (e) {
+      e.preventDefault();
+      var jed = $('#n_zj').value, pol = [];
+      $('#n_rows').querySelectorAll('.sellrow').forEach(function (r) {
+        pol.push({ nazev: r.querySelector('[data-sr="n"]').value, cena: r.querySelector('[data-sr="c"]').value, spotreba: jed === 'l' ? r.querySelector('[data-sr="o"]').value : 1 });
+      });
+      var btn = this.querySelector('button[type=submit]'); btn.disabled = true;
+      api('saveStock', { nazev: $('#n_zn').value, jednotka: jed, baleni: $('#n_zb').value, polozky: pol }).then(function (r) {
+        toast('Zásoba přidána' + (r.polozky && r.polozky.length ? ' + ' + r.polozky.join(', ') : ''));
+        document.activeElement.blur(); return reAdm();
+      }).catch(function (er) { btn.disabled = false; fail(er); });
+    };
+    el.querySelectorAll('[data-chip]').forEach(function (b) {
+      b.onclick = function () {
+        var inp = $('#' + b.dataset.chip); if (!inp) return;
+        b.parentNode.querySelectorAll('[data-chip]').forEach(function (o) { o.classList.toggle('primary', o === b); });
+        if (b.dataset.size) inp.value = fmtNum(+b.dataset.size); else { inp.value = ''; }
+        inp.focus();
+      };
+    });
+    el.querySelectorAll('[data-zx]').forEach(function (b) {
+      b.onclick = function () { var id = b.dataset.id, x = b.dataset.zx; EXP = EXP[id] === x ? {} : (function () { var o = {}; o[id] = x; return o; })(); renderAdmin(); };
+    });
+    var z = ST.stocks.filter(function (q) { return EXP[q.id]; })[0], ok = $('#z_ok');
+    if (!z || !ok) return;
+    var done = function (msg) { return function () { toast(msg); EXP = {}; document.activeElement.blur(); return reAdm(); }; };
+    var x = EXP[z.id], no = $('#z_no');
+    if (no) no.onclick = function () { EXP = {}; renderAdmin(); };
+    ok.onclick = function () {
+      if (x === 'in') {
+        var mnEl = $('#z_mn'), mn = mnEl ? mnEl.value.trim() : '';
+        api('stock', mn ? { zasobaId: z.id, mnozstvi: mn } : { zasobaId: z.id, baleni: ($('#z_bal') || {}).value, velikost: ($('#z_size') || {}).value }).then(done('Naskladněno')).catch(fail);
+      }
+      if (x === 'inv') api('stock', { zasobaId: z.id, inventura: true, stav: $('#z_inv').value }).then(done('Stav uložen')).catch(fail);
+      if (x === 'del') { ok.disabled = true; api('deleteStock', { id: z.id }).then(done('Zásoba „' + z.nazev + '“ smazána')).catch(function (e) { ok.disabled = false; fail(e); }); }
+      if (x === 'edit') api('saveStock', { id: z.id, nazev: $('#z_n').value, jednotka: $('#z_j').value, baleni: $('#z_b').value, obal: $('#z_o').value, nizko: $('#z_lo').value, aktivni: $('#z_a').checked }).then(done('Uloženo')).catch(fail);
+    };
+  }
+
+  function admItems(el) {
+    el.innerHTML = '<form id="addi" class="card" style="margin-bottom:16px"><div class="grid2">' +
+      '<div class="field"><label for="n_in">Nová položka</label><input id="n_in" type="text" placeholder="Např. Plzeň 0,4"></div>' +
+      '<div class="field"><label for="n_ic">Cena Kč</label><input id="n_ic" type="text" inputmode="decimal"></div>' +
+      '<div class="field"><label for="n_iz">Sklad</label><select id="n_iz"><option value="novy">Založit novou zásobu v kusech</option>' +
+        ST.stocks.map(function (z) { return '<option value="' + z.id + '">Brát ze zásoby: ' + esc(z.nazev) + ' (' + z.jednotka + ')</option>'; }).join('') + '<option value="">Bez skladu</option></select></div>' +
+      '<div class="field" id="n_ispw" hidden><label for="n_isp">Kolik ubere</label><input id="n_isp" type="text" inputmode="decimal" placeholder="0,5"></div></div>' +
+      '<div class="muted" id="n_ihint" style="font-size:.82rem;margin-top:8px">Ve Skladu se vytvoří zásoba se stejným názvem (počítá se v kusech).</div>' +
+      '<div style="margin-top:10px"><button class="btn primary" type="submit">Přidat položku</button></div></form>' +
+      '<div class="card">' + ST.items.map(function (i) {
+        var x = EXP[i.id], z = stockOf(i);
+        return '<div class="adm-item"><div class="adm-head"><div class="main"><div style="font-weight:600;font-size:1.1rem">' + esc(i.nazev) + (i.aktivni ? '' : ' <span class="chip">skrytá</span>') + '</div>' +
+          '<div class="muted" style="font-size:.85rem">' + (z ? 'ubere ' + fmtQ(i.spotreba, z.jednotka) + ' z „' + esc(z.nazev) + '“' : 'bez skladu') + '</div></div>' +
+          '<div class="bal num" style="font-size:1.4rem">' + kc(i.cena) + '</div></div>' +
+          '<div class="row" style="margin-top:10px"><button class="btn small' + (x === 'edit' ? ' primary' : '') + '" data-ix="edit" data-id="' + i.id + '">Upravit</button></div>' +
+          (x === 'edit' ? '<div class="adm-panel"><div class="grid2"><div class="field"><label for="i_n">Název</label><input id="i_n" type="text" value="' + esc(i.nazev) + '"></div>' +
+            '<div class="field"><label for="i_c">Cena Kč</label><input id="i_c" type="text" inputmode="decimal" value="' + fmtNum(i.cena) + '"></div>' +
+            '<div class="field"><label for="i_z">Bere ze zásoby</label><select id="i_z">' + zOpts(i.zasobaId) + '</select></div>' +
+            '<div class="field"><label for="i_sp">Kolik ubere (' + (z ? z.jednotka : 'l / ks') + ')</label><input id="i_sp" type="text" inputmode="decimal" value="' + (i.spotreba ? fmtNum(i.spotreba) : '') + '"></div>' +
+            '<div class="field"><label for="i_p">Pořadí (menší = dřív)</label><input id="i_p" type="text" inputmode="numeric" value="' + i.poradi + '"></div></div>' +
+            '<label class="row"><input id="i_a" type="checkbox"' + (i.aktivni ? ' checked' : '') + '> V nabídce</label>' +
+            '<div class="muted" style="font-size:.85rem">Změna ceny nebo objemu platí pro nové zápisy, staré zůstanou jak byly.</div>' +
+            '<div><button class="btn primary" id="i_ok">Uložit</button></div></div>' : '') + '</div>';
+      }).join('') + '</div>';
+    var izUpd = function () {
+      var v = $('#n_iz').value, z = ST.stocks.filter(function (q) { return q.id === v; })[0];
+      $('#n_ispw').hidden = !z;
+      if (z) { $('#n_isp').placeholder = z.jednotka === 'l' ? '0,5' : '1'; $('#n_ispw').querySelector('label').textContent = 'Kolik ubere (' + z.jednotka + ')'; }
+      $('#n_ihint').textContent = v === 'novy' ? 'Ve Skladu se vytvoří zásoba se stejným názvem (počítá se v kusech).' : z ? 'Při prodeji se odepíše ze zásoby „' + z.nazev + '“.' : 'Položka se nebude odepisovat ze skladu.';
+    };
+    $('#n_iz').onchange = izUpd; izUpd();
+    $('#addi').onsubmit = function (e) {
+      e.preventDefault();
+      var v = $('#n_iz').value;
+      api('saveItem', { nazev: $('#n_in').value, cena: num($('#n_ic').value), zasobaId: v, spotreba: v === 'novy' ? 1 : $('#n_isp').value })
+        .then(function () { toast(v === 'novy' ? 'Položka přidána + zásoba ve Skladu' : 'Položka přidána'); document.activeElement.blur(); return reAdm(); }).catch(fail);
+    };
+    el.querySelectorAll('[data-ix]').forEach(function (b) {
+      b.onclick = function () { var id = b.dataset.id, x = b.dataset.ix; EXP = EXP[id] === x ? {} : (function () { var o = {}; o[id] = x; return o; })(); renderAdmin(); };
+    });
+    var open = ST.items.filter(function (i) { return EXP[i.id]; })[0];
+    if (open && $('#i_ok')) $('#i_ok').onclick = function () {
+      api('saveItem', { id: open.id, nazev: $('#i_n').value, cena: num($('#i_c').value), zasobaId: $('#i_z').value, spotreba: $('#i_sp').value, poradi: $('#i_p').value, aktivni: $('#i_a').checked })
+        .then(function () { toast('Uloženo'); EXP = {}; document.activeElement.blur(); return reAdm(); }).catch(fail);
+    };
+  }
+
+  var MF = { obdobi: '', clen: '', typ: '', polozka: '', zdroj: '', stav: '' }, PEND = null;
+  function periodStart(k) {
+    var d = new Date(startToday());
+    if (k === 'dnes') return [d.getTime(), Infinity];
+    if (k === '7d') return [d.getTime() - 6 * 864e5, Infinity];
+    if (k === 'mesic') { d.setDate(1); return [d.getTime(), Infinity]; }
+    if (k === 'minuly') { d.setDate(1); var e = d.getTime(); d.setMonth(d.getMonth() - 1); return [d.getTime(), e]; }
+    return [0, Infinity];
+  }
+  function sel(id, label, val, opts) {
+    return '<div class="field"><label for="' + id + '">' + label + '</label><select id="' + id + '">' + opts.map(function (o) {
+      return '<option value="' + esc(o[0]) + '"' + (val === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></div>';
+  }
+  function admMoves(el) {
+    var f = MF, per = periodStart(f.obdobi);
+    var mv = ST.moves.filter(function (m) {
+      if (m.ts < per[0] || m.ts >= per[1]) return false;
+      if (f.clen && m.clenId !== f.clen) return false;
+      if (f.typ && m.typ !== f.typ) return false;
+      if (f.polozka && m.polozkaId !== f.polozka) return false;
+      if (f.zdroj && m.zdroj !== f.zdroj) return false;
+      if (f.stav === 'ok' && m.storno) return false;
+      if (f.stav === 'zrus' && !m.storno) return false;
+      return true;
+    });
+    var typ = { konzumace: 'Útrata', platba: 'Platba', naskladneni: 'Sklad' };
+    var sumU = 0, sumP = 0, ksU = 0;
+    mv.forEach(function (m) { if (m.storno) return; if (m.typ === 'konzumace') { sumU += m.castka; ksU += m.ks; } if (m.typ === 'platba') sumP += m.castka; });
+    var active = Object.keys(f).some(function (k) { return f[k]; });
+    el.innerHTML = '<div class="card filters">' +
+      sel('mf_obdobi', 'Období', f.obdobi, [['', 'Vše'], ['dnes', 'Dnes (od 6:00)'], ['7d', 'Posledních 7 dní'], ['mesic', 'Tento měsíc'], ['minuly', 'Minulý měsíc']]) +
+      sel('mf_clen', 'Kdo', f.clen, [['', 'Všichni']].concat(ST.members.slice().sort(function (a, b) { return a.jmeno.localeCompare(b.jmeno, 'cs'); }).map(function (m) { return [m.id, m.jmeno]; }))) +
+      sel('mf_typ', 'Typ', f.typ, [['', 'Vše'], ['konzumace', 'Útrata'], ['platba', 'Platba'], ['naskladneni', 'Sklad']]) +
+      sel('mf_polozka', 'Položka', f.polozka, [['', 'Všechny']].concat(ST.items.map(function (i) { return [i.id, i.nazev]; }))) +
+      sel('mf_zdroj', 'Zapsal', f.zdroj, [['', 'Kdokoli'], ['member', 'Mobil'], ['tablet', 'Tablet'], ['admin', 'Správce']]) +
+      sel('mf_stav', 'Stav', f.stav, [['', 'Vše'], ['ok', 'Platné'], ['zrus', 'Zrušené']]) +
+      '</div>' +
+      '<div class="row" style="justify-content:space-between;margin:12px 0">' +
+      '<div class="row" style="gap:20px"><span><span class="muted">Záznamů</span> <b class="num">' + mv.length + '</b></span>' +
+      '<span><span class="muted">Útrata</span> <b class="num">' + kc(sumU) + '</b> <span class="muted num">(' + ksU + ' ks)</span></span>' +
+      '<span><span class="muted">Platby</span> <b class="num good">' + kc(sumP) + '</b></span></div>' +
+      (active ? '<button class="btn small" id="flt_reset">Zrušit filtry</button>' : '') + '</div>' +
+      (PEND ? (function () { var x = ST.moves.filter(function (m) { return m.id === PEND; })[0]; if (!x) { PEND = null; return ''; }
+        return '<div class="card confirm"><div><div class="eyebrow bad">Opravdu zrušit tento záznam?</div><div style="font-weight:600;font-size:1.1rem;margin-top:4px">' + esc(x.clen || '–') + ' · ' +
+          (x.typ === 'platba' ? 'platba ' + kc(x.castka) : (x.ks !== 1 ? x.ks + '× ' : '') + esc(x.polozka) + (x.castka ? ' · ' + kc(x.castka) : '')) + '</div><div class="muted">' + dt(x.ts) + '</div></div>' +
+          '<div class="row"><button class="btn primary" id="st_yes">Ano, zrušit</button><button class="btn" id="st_no">Ne</button></div></div>'; })() : '') +
+      '<div class="card tablewrap"><table><thead><tr><th>Kdy</th><th>Typ</th><th>Kdo</th><th>Co</th><th>Množství</th><th>Kč</th><th>Zapsal</th><th>Zrušil</th><th></th></tr></thead><tbody>' +
+      (mv.length ? mv.map(function (m) {
+        var amt = m.typ === 'platba' ? '<span class="good">+' + kc(m.castka) + '</span>' : m.typ === 'konzumace' ? '−' + kc(m.castka) : '';
+        var co = m.typ === 'platba' ? (m.pozn === 'qr' ? 'převodem' : 'hotově') : m.typ === 'naskladneni' ? esc(m.zasoba) + (m.pozn ? ' (' + esc(m.pozn) + ')' : '') : esc(m.polozka);
+        return '<tr class="' + (m.storno ? 'storno' : '') + (PEND === m.id ? ' pend' : '') + '"><td class="num">' + dt(m.ts) + '</td><td>' + typ[m.typ] + '</td><td>' + esc(m.clen || '–') + '</td><td>' + co + '</td>' +
+          '<td class="num">' + (m.typ === 'platba' ? '' : m.typ === 'naskladneni' ? (m.mnozstvi > 0 ? '+' : '−') + fmtQ(Math.abs(m.mnozstvi), m.jednotka) : m.ks) + '</td><td class="num">' + amt + '</td><td class="muted">' + ({ member: 'mobil', tablet: 'tablet', admin: 'správce' }[m.zdroj] || m.zdroj) + '</td>' +
+          '<td>' + (m.storno ? '<span class="bad">' + stornoWho(m) + '</span>' : '') + '</td><td>' + (m.storno ? '' : '<button class="btn small" data-st="' + m.id + '">Storno</button>') + '</td></tr>';
+      }).join('') : '<tr><td colspan="9" class="muted">Filtru nic neodpovídá.</td></tr>') + '</tbody></table></div>';
+    ['obdobi', 'clen', 'typ', 'polozka', 'zdroj', 'stav'].forEach(function (k) { $('#mf_' + k).onchange = function () { MF[k] = this.value; PEND = null; this.blur(); renderAdmin(); }; });
+    var rs = $('#flt_reset'); if (rs) rs.onclick = function () { Object.keys(MF).forEach(function (k) { MF[k] = ''; }); renderAdmin(); };
+    el.querySelectorAll('[data-st]').forEach(function (b) {
+      b.onclick = function () { PEND = b.dataset.st; renderAdmin(); window.scrollTo(0, 0); };
+    });
+    var y = $('#st_yes'), n = $('#st_no');
+    if (y) y.onclick = function () { var id = PEND; y.disabled = true; PEND = null; undoMove(id); };
+    if (n) n.onclick = function () { PEND = null; renderAdmin(); };
+  }
+
+  function admSettings(el) {
+    var s = ST.settings, tl = BASE + '?t=' + encodeURIComponent(s.tabletKey || '');
+    el.innerHTML = '<div class="narrow" style="margin:0"><div class="card" style="display:flex;flex-direction:column;gap:12px">' +
+      '<div class="field"><label for="s_k">Název klubu</label><input id="s_k" type="text" value="' + esc(s.klub) + '"></div>' +
+      '<div class="field"><label for="s_i">Číslo účtu (IBAN) pro QR platby</label><input id="s_i" type="text" placeholder="CZ65 0800 0000 1920 0014 5399" value="' + esc(ibanPretty(s.iban)) + '"></div>' +
+      '<div class="field"><label for="s_p">Nový PIN správce (nech prázdné = beze změny)</label><input id="s_p" type="password" inputmode="numeric"></div>' +
+      '<div><button class="btn primary" id="s_ok">Uložit nastavení</button></div></div>' +
+      '<section class="sec"><h2>Odkaz pro tablet</h2><div class="card"><div class="qrbox"><div class="qr">' + qrSvg(tl) + '</div><div class="qrinfo">' +
+      '<div class="mono">' + esc(tl) + '</div><div class="row"><button class="btn small" id="s_copy">Kopírovat</button>' +
+      (DEMO ? '<button class="btn small" id="s_open">Otevřít v demu</button>' : '<a class="btn small" href="' + esc(tl) + '" target="_blank" rel="noopener">Otevřít</a>') +
+      '<button class="btn small" id="s_new">Nový odkaz</button></div><div class="muted" style="font-size:.85rem">Tablet vidí všechny zůstatky. Odkaz drž jen na tabletu v klubovně.</div></div></div></div></section>' +
+      printSettingsHtml() + '</div>';
+    wirePrintSettings();
+    $('#s_ok').onclick = function () {
+      var p = { klub: $('#s_k').value, iban: $('#s_i').value };
+      var np = $('#s_p').value.trim(); if (np) p.adminPin = np;
+      api('saveSettings', p).then(function () { if (np) { AUTH = { admin: np }; ss('pk_admin', np); } toast('Nastavení uloženo'); document.activeElement.blur(); return reAdm(); }).catch(fail);
+    };
+    $('#s_copy').onclick = function () { copy(tl, this); };
+    var o = $('#s_open'); if (o) o.onclick = function () { go({ t: s.tabletKey }); };
+    var nb = $('#s_new');
+    nb.onclick = function () {
+      if (!nb.dataset.sure) { nb.dataset.sure = '1'; nb.textContent = 'Starý přestane fungovat. Opravdu?'; return; }
+      api('saveSettings', { novyTablet: true }).then(function () { toast('Nový odkaz pro tablet je připravený'); return reAdm(); }).catch(fail);
+    };
+  }
+
+  /* ================= ROUTER ================= */
+  function go(r) {
+    closeSheet(); clearInterval(POLL); ROUTE = r; window.scrollTo(0, 0);
+    if (DEMO) renderDemoBar();
+    if (r.m) {
+      AUTH = { token: r.m }; renderCurrent = renderMember; qLoad();
+      loadOrCache().then(function () { renderMember(); poll(30000, renderMember); }, landingErr);
+    } else if (r.admin) {
+      r.fromTablet = !!r.t;
+      var saved = ss('pk_admin'); renderCurrent = renderAdmin; Q = []; netBar();
+      if (saved) { AUTH = { admin: saved }; load().then(function () { renderAdmin(); poll(PS.on ? 10000 : 30000, adminPoll); }, function () { ss('pk_admin', null); renderAdminLogin(); }); }
+      else renderAdminLogin();
+    } else if (r.t) {
+      AUTH = { tablet: r.t }; renderCurrent = renderTablet; qLoad();
+      try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(function () {}); } catch (e) {}
+      loadOrCache().then(function () { renderTablet(); poll(10000, renderTablet); }, landingErr);
+    } else landing();
+  }
+  function landingErr(e) {
+    app.innerHTML = '<div class="narrow"><div class="top"><h1>Garage</h1></div><div class="card"><p class="bad">' + esc(e.message) + '</p></div></div>';
+  }
+  function landing() {
+    app.innerHTML = '<div class="narrow"><div class="top"><h1>Garage</h1></div><div class="card">' +
+      '<p>Otevři svůj osobní odkaz, který ti poslal pokladník.</p>' +
+      '<button class="btn" id="la">Jsem správce</button></div></div>';
+    $('#la').onclick = function () { go({ admin: true }); };
+  }
+
+  /* ================= DEMO ================= */
+  var DEMO_DB = null;
+  function renderDemoBar() {
+    var d = $('#demo'); d.hidden = false;
+    d.className = 'wrap demo';
+    var pepa = DEMO_DB.members.filter(function (m) { return m.jmeno === 'Pepa'; })[0];
+    d.innerHTML = '<b>DEMO</b><span class="muted">ukázková data, nic se neukládá. Přepni pohled:</span>' +
+      '<button class="btn small" data-g="t">Tablet</button><button class="btn small" data-g="m">Mobil – Pepa</button><button class="btn small" data-g="a">Správce (PIN 1234)</button>' +
+      '<button class="btn small' + (DEMO_OFFLINE ? ' primary' : '') + '" id="demo_net">' + (DEMO_OFFLINE ? 'Zapnout internet' : 'Simulovat výpadek internetu') + '</button>';
+    $('#demo_net').onclick = function () {
+      DEMO_OFFLINE = !DEMO_OFFLINE; renderDemoBar();
+      if (DEMO_OFFLINE) { setNet(true); toast('Internet vypnut (simulace). Zkus zapisovat.'); }
+      else { setNet(false); toast('Internet zapnut. Fronta se odesílá.'); if (Q.length) flush(); else load().then(renderCurrent, function () {}); }
+    };
+    d.querySelectorAll('[data-g]').forEach(function (b) {
+      b.onclick = function () {
+        var g = b.dataset.g;
+        if (g === 't') go({ t: 'demo-tablet' }); else if (g === 'm') go({ m: pepa.token }); else go({ admin: true, t: 'demo-tablet' });
+      };
+    });
+  }
+  function seedDemo() {
+    var t = Date.now(), H = 3600e3, D = 24 * H;
+    var db = { settings: { klub: 'Garage', iban: 'CZ6508000000192000145399', adminPin: '1234', tabletKey: 'demo-tablet' }, members: [], items: [], stocks: [], moves: [] };
+    [['zp', 'Plzeň – sud', 'l', 15, 'sud', 5], ['zy', 'Yuzu – sud', 'l', 15, 'sud', 5], ['zzv', 'Zmrzlina velká', 'ks', 1, 'ks', 6], ['zzm', 'Zmrzlina malá', 'ks', 1, 'ks', 6]]
+      .forEach(function (x, i) { db.stocks.push({ id: x[0], nazev: x[1], jednotka: x[2], stav: 0, baleni: x[3], obal: x[4], nizko: x[5], aktivni: 1, poradi: (i + 1) * 10 }); });
+    [['Plzeň velká', 50, 'zp', 0.5], ['Plzeň malá', 35, 'zp', 0.3], ['Yuzu velké', 50, 'zy', 0.5], ['Yuzu malé', 35, 'zy', 0.3], ['Zmrzlina velká', 50, 'zzv', 1], ['Zmrzlina malá', 35, 'zzm', 1]]
+      .forEach(function (x, i) { db.items.push({ id: 'i' + i, nazev: x[0], cena: x[1], zasobaId: x[2], spotreba: x[3], aktivni: 1, poradi: (i + 1) * 10 }); });
+    [['Pepa', 101], ['Honza', 102], ['Míra', 103], ['Standa', 104]]
+      .forEach(function (x, i) { db.members.push({ id: 'c' + i, jmeno: x[0], token: 'demo' + x[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''), pin: '', typ: 'clen', aktivni: 1, vs: x[1] }); });
+    db.members[0].oblibena = 'i1';
+    db.members.push({ id: 'host', jmeno: 'Host', token: '', pin: '', typ: 'host', aktivni: 1, vs: 100 });
+    var n = 0;
+    function zs(id) { return db.stocks.filter(function (z) { return z.id === id; })[0]; }
+    function nask(z, q, ago, note) { db.moves.push({ id: 'd' + (n++), ts: t - ago, typ: 'naskladneni', clenId: '', polozkaId: '', ks: 0, castka: 0, zdroj: 'admin', storno: 0, pozn: note === true ? 'inventura' : (note || ''), zasobaId: z, mnozstvi: q }); zs(z).stav = Math.round((zs(z).stav + q) * 1000) / 1000; }
+    function k(c, i, ks, ago) { var it = db.items[i], q = ks * it.spotreba; db.moves.push({ id: 'd' + (n++), ts: t - ago, typ: 'konzumace', clenId: c, polozkaId: it.id, ks: ks, castka: ks * it.cena, zdroj: 'member', storno: 0, pozn: '', zasobaId: it.zasobaId, mnozstvi: q }); zs(it.zasobaId).stav = Math.round((zs(it.zasobaId).stav - q) * 1000) / 1000; }
+    function p(c, a, ago, zp) { db.moves.push({ id: 'd' + (n++), ts: t - ago, typ: 'platba', clenId: c, polozkaId: '', ks: 0, castka: a, zdroj: 'admin', storno: 0, pozn: zp }); }
+    nask('zp', 45, 12 * D, '3× 15 l'); nask('zy', 15, 12 * D, '1× 15 l'); nask('zzv', 10, 12 * D); nask('zzm', 6, 12 * D);
+    nask('zp', 30, 3.5 * D, '1× 30 l');
+    k('c3', 0, 6, 9 * D); k('c1', 0, 5, 9 * D); k('c3', 5, 2, 9 * D); k('c0', 1, 4, 8 * D); k('c2', 0, 6, 7 * D);
+    p('c0', 1000, 6 * D, 'qr'); k('c0', 0, 3, 6 * D - H); k('c1', 0, 4, 5 * D); k('c1', 2, 2, 5 * D - H);
+    nask('zp', -1.4, 4 * D, true);
+    p('c2', 300, 3 * D, 'hotove'); k('c2', 1, 2, 3 * D - H); k('c2', 2, 1, 2 * D); k('c0', 4, 1, 2 * D);
+    // poslední večer: včera 19–22 h (dnešek začíná prázdný jako v ostrém provozu)
+    var y0 = startToday() - 24 * H; // začátek předchozího klubového dne (6:00)
+    var ago = function (h) { return t - (y0 + (h - DAY_START_H) * H); };
+    k('c0', 0, 2, ago(19.5)); k('c1', 0, 1, ago(20.2)); k('c1', 3, 1, ago(21)); k('c3', 1, 2, ago(21.5)); k('host', 0, 2, ago(22));
+    // docházka: minulé večery (historie pro správce); teď je zavřeno
+    db.visits = []; var vn = 0;
+    function vis(typ, c, od, doo, jak, kdo) { db.visits.push({ id: 'v' + (vn++), typ: typ, clenId: c, od: t - od, posledni: t - doo, do: t - doo, jak: jak, kdo: kdo }); }
+    vis('garaz', '', ago(19), ago(23.6), 'tablet', 'tablet');
+    vis('clen', 'c0', ago(19.1), ago(22.8), 'sam', 'member'); vis('clen', 'c1', ago(19.9), ago(23.6), 'zavreno', 'tablet');
+    vis('clen', 'c3', ago(21.2), ago(22.5), 'automaticky', 'member');
+    vis('garaz', '', ago(-48 + 18.5), ago(-48 + 22.4), 'automaticky', 'member');
+    vis('clen', 'c2', ago(-48 + 18.5), ago(-48 + 21.4), 'automaticky', 'member'); vis('clen', 'c0', ago(-48 + 19), ago(-48 + 22.4), 'sam', 'member');
+    vis('garaz', '', ago(-72 + 17), ago(-72 + 23), 'admin', 'admin');
+    vis('clen', 'c1', ago(-72 + 17.2), ago(-72 + 23), 'zavreno', 'tablet'); vis('clen', 'c2', ago(-72 + 18), ago(-72 + 20.5), 'tablet', 'tablet');
+    return db;
+  }
+
+  /* offline otevření stránky (jen po nasazení na https, ne v demu) */
+  if (!DEMO && 'serviceWorker' in navigator && location.protocol === 'https:') {
+    try { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {}); } catch (e) {}
+  }
+
+  /* automatická aktualizace: stránka si každých 5 minut (a po probuzení) zkontroluje, jestli na webu není novější verze.
+     Když ano, počká na vhodnou chvíli (nikdo zrovna nepíše, není otevřený panel člena) a sama se znovu načte. */
+  var UPDATE_READY = false;
+  function checkUpdate() {
+    if (DEMO || UPDATE_READY || !navigator.onLine) return;
+    fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+      var m = /var APP_VERSION = '([^']+)'/.exec(t || '');
+      if (m && m[1] !== APP_VERSION && m[1] !== '__BUILD__') { UPDATE_READY = true; tryReload(); }
+    }).catch(function () {});
+  }
+  function idleNow() {
+    var a = document.activeElement;
+    return !OPEN && !(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) && !FLUSHING && !(PEND) ;
+  }
+  function tryReload() {
+    if (!UPDATE_READY) return;
+    if (!idleNow()) { setTimeout(tryReload, 20000); return; }
+    toast('Nahrávám novou verzi pokladny…', { ms: 2500 });
+    setTimeout(function () { location.reload(); }, 1500);
+  }
+  if (!DEMO) {
+    setInterval(checkUpdate, 5 * 60 * 1000);
+    setTimeout(checkUpdate, 30 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { if (UPDATE_READY) tryReload(); else checkUpdate(); } });
+  }
+
+  /* ================= START ================= */
+  var q = new URLSearchParams(location.search);
+  if (DEMO) {
+    DEMO_DB = seedDemo();
+    var hm = (location.hash || '').slice(1);
+    var dm = hm && DEMO_DB.members.filter(function (x) { return x.token === hm && x.typ !== 'host'; })[0];
+    go(dm ? { m: dm.token } : { t: 'demo-tablet' });
+  } else if (q.get('m')) go({ m: q.get('m') });
+  else if (q.has('admin')) go({ admin: true, t: q.get('t') || '' });
+  else if (q.get('t')) go({ t: q.get('t') });
+  else go({});
+})();
+</script>
+</body>
+</html>

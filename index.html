@@ -266,7 +266,7 @@ tr.pend td{background:#3a1f1a}
    Bez config.js stránka běží v DEMO režimu s ukázkovými daty v paměti. */
 var API_URL = (window.GARAGE_API || '').trim();
 if (!/^https:\/\/script\.google\.com\//.test(API_URL)) API_URL = ''; // nevyplněný config.js = demo
-var APP_VERSION = '20261026-201351'; // vyplní se samo při sestavení – podle toho se pozná nová verze
+var APP_VERSION = '20261027-072223'; // vyplní se samo při sestavení – podle toho se pozná nová verze
 /* ================================================ */
 </script>
 <script>
@@ -2735,7 +2735,7 @@ var CORE = (function () {
 
   function settingsOut(db, admin) {
     var s = db.settings, o = { klub: s.klub || 'Klub', iban: s.iban || '', nizkySklad: +s.nizkySklad || 0 };
-    if (admin) { o.tabletKey = s.tabletKey; }
+    if (admin) { o.tabletKey = s.tabletKey; o.posledniZaloha = +s.posledniZaloha || 0; }
     return o;
   }
 
@@ -4182,6 +4182,9 @@ var CORE = (function () {
       '<div class="mono">' + esc(tl) + '</div><div class="row"><button class="btn small" id="s_copy">Kopírovat</button>' +
       (DEMO ? '<button class="btn small" id="s_open">Otevřít v demu</button>' : '<a class="btn small" href="' + esc(tl) + '" target="_blank" rel="noopener">Otevřít</a>') +
       '<button class="btn small" id="s_new">Nový odkaz</button></div><div class="muted" style="font-size:.85rem">Tablet vidí všechny zůstatky. Odkaz drž jen na tabletu v klubovně.</div></div></div></div></section>' +
+      '<section class="sec"><h2>Záloha dat</h2><div class="card"><div class="row" style="justify-content:space-between">' +
+        '<div>' + (s.posledniZaloha ? 'Poslední záloha: <b>' + dt(s.posledniZaloha) + '</b>' + (now() - s.posledniZaloha > 8 * 864e5 ? ' <span class="chip" style="color:var(--bad);border-color:var(--bad)">starší než týden</span>' : '') : '<span class="warn">Automatická záloha zatím není zapnutá.</span>') + '</div></div>' +
+        '<div class="muted" style="font-size:.85rem;margin-top:6px">Kopie tabulky se každé pondělí ukládá na Google Disk do složky „Pokladna Garage – zálohy“ (drží se 12 posledních). Zapíná se v Apps Scriptu funkcí <span class="mono">zapnoutZalohy</span>.</div></div></section>' +
       printSettingsHtml() + '</div>';
     wirePrintSettings();
     $('#s_ok').onclick = function () {

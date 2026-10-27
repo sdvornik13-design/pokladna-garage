@@ -118,6 +118,17 @@ input:focus{border-color:var(--amber);outline:none}
 .mcard.host{border-style:dashed}
 .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;background:var(--panel2);border:1px solid var(--line)}
 .pres{margin:0 0 16px;padding:14px 16px}
+.reqbanner{display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin:0 0 16px;padding:14px 16px;border-radius:var(--r);border:2px solid var(--amber);background:#3a2c12;color:var(--fg);animation:rqblink 1.1s ease-in-out infinite}
+.reqbanner b{font-family:var(--display);font-size:1.25rem}
+.rqwho{display:block;font-size:.85rem;color:var(--muted);margin-top:2px}
+.rqcta{margin-left:auto;font-weight:700;color:var(--amber);white-space:nowrap}
+.rqdot{width:14px;height:14px;border-radius:50%;background:var(--amber);flex:none;box-shadow:0 0 0 0 rgba(234,167,51,.7);animation:live 1.4s infinite}
+@keyframes rqblink{50%{background:#5a4214;border-color:#ffd27a}}
+.tabbadge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font-size:.75rem;margin-left:4px;animation:rqblink2 1.1s infinite}
+@keyframes rqblink2{50%{opacity:.35}}
+.reqcard{padding:12px;margin-bottom:12px;border:1px dashed var(--warn);border-radius:10px}
+.reqadm{margin-bottom:10px;border-color:var(--amber)}
+.okbtn{background:var(--good);border-color:var(--good);color:#0d2416}
 .sndbtn{display:inline-flex;align-items:center;justify-content:center;padding:6px 8px;line-height:0}
 .eyebrow .sndbtn{padding:2px 6px;border:0;color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
@@ -255,7 +266,7 @@ tr.pend td{background:#3a1f1a}
    Bez config.js stránka běží v DEMO režimu s ukázkovými daty v paměti. */
 var API_URL = (window.GARAGE_API || '').trim();
 if (!/^https:\/\/script\.google\.com\//.test(API_URL)) API_URL = ''; // nevyplněný config.js = demo
-var APP_VERSION = '20261025-201605'; // vyplní se samo při sestavení – podle toho se pozná nová verze
+var APP_VERSION = '20261026-201351'; // vyplní se samo při sestavení – podle toho se pozná nová verze
 /* ================================================ */
 </script>
 <script>
@@ -2750,7 +2761,8 @@ var CORE = (function () {
       var mine = db.moves.filter(function (m) { return m.clenId === me.id; }).sort(function (x, y) { return y.ts - x.ts; });
       return { role: 'member', settings: settingsOut(db), items: itemsOut(db), stocks: stocksOut(db), presence: presenceOut(db, now),
         me: { id: me.id, jmeno: me.jmeno, vs: me.vs, balance: balance(db, me.id), oblibena: me.oblibena || '', hlavni: mainItem(db, me) },
-        moves: mine.slice(0, 60).map(function (m) { return moveOut(db, m); }), now: now, undoMs: UNDO_MS };
+        moves: mine.slice(0, 60).map(function (m) { return moveOut(db, m); }), now: now, undoMs: UNDO_MS,
+        reqs: reqs(db).filter(function (r) { return r.clenId === me.id; }).sort(function (x, y) { return y.ts - x.ts; }).slice(0, 8).map(function (r) { return reqOut(db, r); }) };
     }
     var admin = w.role === 'admin';
     var members = db.members.filter(function (m) { return admin || act(m); }).map(function (m) {
@@ -2766,6 +2778,7 @@ var CORE = (function () {
     var moves = db.moves.slice().sort(function (x, y) { return y.ts - x.ts; }).slice(0, admin ? 3000 : 80);
     return { role: w.role, settings: settingsOut(db, admin), items: itemsOut(db, admin), stocks: stocksOut(db, admin), members: members,
       presence: presenceOut(db, now), visits: admin ? visitsOut(db, now) : undefined,
+      reqs: reqs(db).filter(function (r) { return admin ? true : r.stav === 'ceka'; }).sort(function (x, y) { return y.ts - x.ts; }).slice(0, admin ? 300 : 30).map(function (r) { return reqOut(db, r); }),
       moves: moves.map(function (m) { return moveOut(db, m); }), now: now, undoMs: UNDO_MS };
   }
 
@@ -2815,6 +2828,12 @@ var CORE = (function () {
     return { ok: true };
   }
 
+  function addPayment(db, m, c, zp, zdroj) {
+    var mv = { id: newId('p'), ts: Date.now(), typ: 'platba', clenId: m.id, polozkaId: '', ks: 0, castka: c,
+      zdroj: zdroj, storno: 0, pozn: zp, zustatek: r2(balance(db, m.id) + c) };
+    db.moves.push(mv); op(db, 'append', 'moves', mv);
+    return mv;
+  }
   function pay(db, a, p) {
     var w = who(db, a), m = memberById(db, p.clenId);
     if (!m) err('Člen nenalezen.');
@@ -2822,10 +2841,49 @@ var CORE = (function () {
     if (w.role === 'tablet') err('Platbu zapisuje jen správce.');
     var c = r2(+p.castka);
     if (!(c > 0) || c > 100000) err('Zadej částku.');
+    addPayment(db, m, c, p.zpusob === 'qr' ? 'qr' : 'hotove', w.role);
+    return { ok: true, balance: balance(db, m.id) };
+  }
+
+  /* ---------- hlášení plateb: člen nahlásí, správce zkontroluje v bance / převezme hotovost a přijme ---------- */
+  function reqs(db) { return db.reqs = db.reqs || []; }
+  function reqOut(db, r) {
+    var m = memberById(db, r.clenId);
+    return { id: r.id, ts: +r.ts, clenId: r.clenId, jmeno: m ? m.jmeno : '?', vs: m ? m.vs : '', castka: +r.castka, zpusob: r.zpusob,
+      stav: r.stav, vyrizeno: +r.vyrizeno || 0, kdo: r.kdo || '', duvod: r.duvod || '', cislo: r.cislo || '' };
+  }
+  function requestPay(db, a, p) {
+    var w = who(db, a), m = w.role === 'member' ? w.member : memberById(db, p.clenId);
+    if (w.role === 'admin') err('Správce platbu rovnou zapíše v Členové → Přijmout platbu.');
+    if (!m || !act(m)) err('Člen nenalezen.');
+    var c = r2(num(p.castka)); if (!(c >= 1) || c > 100000) err('Zadej částku.');
     var zp = p.zpusob === 'qr' ? 'qr' : 'hotove';
-    var mv = { id: newId('p'), ts: Date.now(), typ: 'platba', clenId: m.id, polozkaId: '', ks: 0, castka: c,
-      zdroj: w.role, storno: 0, pozn: zp, zustatek: r2(balance(db, m.id) + c) };
-    db.moves.push(mv); op(db, 'append', 'moves', mv);
+    var open = reqs(db).filter(function (r) { return r.clenId === m.id && r.stav === 'ceka'; });
+    if (open.length >= 5) err('Máš 5 nevyřízených hlášení. Počkej, až je správce potvrdí, nebo některé zruš.');
+    var cislo = reqs(db).reduce(function (s, r) { return Math.max(s, +r.cislo || 0); }, 0) + 1;
+    var r = { id: newId('r'), ts: Date.now(), clenId: m.id, castka: c, zpusob: zp, stav: 'ceka', vyrizeno: 0, kdo: w.role, duvod: '', cislo: cislo, moveId: '' };
+    reqs(db).push(r); op(db, 'append', 'reqs', r);
+    return { ok: true, req: reqOut(db, r) };
+  }
+  function cancelPayReq(db, a, p) {
+    var w = who(db, a), r = reqs(db).filter(function (x) { return x.id === p.id; })[0];
+    if (!r || r.stav !== 'ceka') err('Hlášení už je vyřízené.');
+    if (w.role === 'member' && r.clenId !== w.member.id) err('Cizí hlášení.');
+    r.stav = 'zruseno'; r.vyrizeno = Date.now(); op(db, 'update', 'reqs', r);
+    return { ok: true };
+  }
+  function resolvePayReq(db, a, p) {
+    needAdmin(db, a);
+    var r = reqs(db).filter(function (x) { return x.id === p.id; })[0];
+    if (!r || r.stav !== 'ceka') err('Hlášení už je vyřízené.');
+    var m = memberById(db, r.clenId); if (!m) err('Člen nenalezen.');
+    r.vyrizeno = Date.now();
+    if (p.prijmout) {
+      var c = p.castka != null && p.castka !== '' ? r2(num(p.castka)) : +r.castka;   // správce může opravit částku podle banky
+      if (!(c > 0)) err('Zadej částku.');
+      r.moveId = addPayment(db, m, c, r.zpusob, 'admin').id; r.stav = 'prijato'; if (c !== +r.castka) r.duvod = 'přijato ' + c + ' Kč';
+    } else { r.stav = 'zamitnuto'; r.duvod = String(p.duvod || '').slice(0, 120); }
+    op(db, 'update', 'reqs', r);
     return { ok: true, balance: balance(db, m.id) };
   }
 
@@ -2982,7 +3040,7 @@ var CORE = (function () {
     return { ok: true };
   }
 
-  var API = { state: state, checkPin: checkPin, add: add, checkin: checkin, checkout: checkout, setOpen: setOpen, setFav: setFav, undo: undo, pay: pay, stock: stock, saveStock: saveStock, deleteStock: deleteStock, deleteItem: deleteItem, saveItem: saveItem, saveMember: saveMember, saveSettings: saveSettings };
+  var API = { state: state, checkPin: checkPin, add: add, checkin: checkin, checkout: checkout, setOpen: setOpen, setFav: setFav, requestPay: requestPay, cancelPayReq: cancelPayReq, resolvePayReq: resolvePayReq, undo: undo, pay: pay, stock: stock, saveStock: saveStock, deleteStock: deleteStock, deleteItem: deleteItem, saveItem: saveItem, saveMember: saveMember, saveSettings: saveSettings };
   function run(db, action, auth, payload) {
     if (!API[action]) err('Neznámá akce.');
     return API[action](db, auth, payload || {});
@@ -3252,6 +3310,7 @@ var CORE = (function () {
       else if (kind === 'big') { tone(660, 990, 0.08, 'triangle', 0.25); tone(1320, 0, 0.18, 'sine', 0.12, 0.06); } // „cink“ sklenice
       else if (kind === 'ok') { tone(784, 0, 0.12, 'sine', 0.2); tone(1175, 0, 0.2, 'sine', 0.18, 0.1); }  // potvrzení
       else if (kind === 'undo') { tone(700, 350, 0.16, 'triangle', 0.2); }                     // klesající tón
+      else if (kind === 'pay') { tone(988, 0, 0.16, 'sine', 0.22); tone(1319, 0, 0.16, 'sine', 0.22, 0.14); tone(988, 0, 0.16, 'sine', 0.22, 0.42); tone(1319, 0, 0.26, 'sine', 0.22, 0.56); } // ding-dong 2×
       else if (kind === 'err') { tone(220, 180, 0.22, 'square', 0.12); }                       // bzučák
     } catch (e) {}
   }
@@ -3355,6 +3414,97 @@ var CORE = (function () {
     };
   }
 
+  /* ================= HLÁŠENÍ PLATEB ================= */
+  var ZPUSOB = { qr: 'QR / převodem', hotove: 'hotově' };
+  var RSTAV = { ceka: 'čeká na potvrzení', prijato: 'přijato', zamitnuto: 'zamítnuto', zruseno: 'zrušeno' };
+  function pendingReqs() { return (ST.reqs || []).filter(function (r) { return r.stav === 'ceka'; }); }
+  var KNOWN_REQ = null;
+  function reqAlert() { // nové hlášení → zvuk (tablet, správce)
+    var ids = pendingReqs().map(function (r) { return r.id; });
+    if (KNOWN_REQ && ids.some(function (id) { return KNOWN_REQ.indexOf(id) < 0; })) sfx('pay');
+    KNOWN_REQ = ids;
+  }
+  function reqBanner(where) {
+    var P = pendingReqs(); if (!P.length) return '';
+    var sum = P.reduce(function (t, r) { return t + r.castka; }, 0);
+    return '<button type="button" class="reqbanner" id="rq_go"><span class="rqdot"></span><span><b>' + P.length + ' ' + plural(P.length, 'platba čeká', 'platby čekají', 'plateb čeká') + ' na potvrzení</b> · ' + kc(sum) +
+      '<span class="rqwho">' + P.slice(0, 4).map(function (r) { return esc(r.jmeno) + ' ' + kc(r.castka) + ' (' + (r.zpusob === 'qr' ? 'QR' : 'hotově') + ')'; }).join(' · ') + (P.length > 4 ? ' …' : '') + '</span></span>' +
+      '<span class="rqcta">' + (where === 'admin' ? 'Zobrazit' : 'Potvrdit ve Správci') + ' →</span></button>';
+  }
+  function wireReqBanner(where) {
+    var b = $('#rq_go'); if (!b) return;
+    b.onclick = function () { if (where === 'admin') { TAB = 'platby'; EXP = {}; renderAdmin(); } else go({ admin: true, t: ROUTE.t, tab: 'platby' }); };
+  }
+  function memberPayHtml(me) {
+    var debt = me.balance < 0 ? Math.ceil(-me.balance) : 0, R = ST.reqs || [];
+    var pend = R.filter(function (r) { return r.stav === 'ceka'; }), done = R.filter(function (r) { return r.stav !== 'ceka'; }).slice(0, 3);
+    var h = '<section class="sec"><h2>' + (debt ? 'Zaplatit dluh' : 'Dobít kredit') + '</h2><div class="card">';
+    pend.forEach(function (r, i) {
+      h += '<div class="reqcard"><div class="row" style="justify-content:space-between"><div><div class="eyebrow warn">Hlášení č. ' + r.cislo + ' · ' + RSTAV.ceka + '</div>' +
+        '<div class="bal" style="font-size:1.5rem">' + kc(r.castka) + ' <span class="muted" style="font-size:1rem">' + ZPUSOB[r.zpusob] + '</span></div></div>' +
+        '<button class="btn small" data-rqcancel="' + r.id + '">Zrušit</button></div>' +
+        (r.zpusob === 'qr' ? (i === 0 ? '<div style="margin-top:10px">' + payBox(r.castka, me.vs, ST.settings.klub + ' ' + me.jmeno + ' c' + r.cislo) + '</div>' : '') +
+          '<p class="muted" style="font-size:.85rem;margin:8px 0 0">Zaplať v bance. Správce platbu zkontroluje a potvrdí, pak se ti připíše.</p>'
+          : '<p class="muted" style="font-size:.85rem;margin:8px 0 0">Předej ' + kc(r.castka) + ' správci. Po převzetí ti platbu potvrdí.</p>') + '</div>';
+    });
+    h += '<div class="field"><label for="payamt">Částka</label><input id="payamt" type="number" inputmode="numeric" min="1" step="1" value="' + (debt || 500) + '"></div>' +
+      '<div class="row" style="margin-top:10px"><button class="btn primary" id="rq_qr">Zaplatit QR kódem</button><button class="btn" id="rq_cash">Zaplatím hotově</button></div>' +
+      '<p class="muted" style="font-size:.85rem;margin:10px 0 0">Platba se připíše, až ji správce potvrdí.</p>';
+    if (done.length) h += '<div class="list" style="margin-top:12px">' + done.map(function (r) {
+      return '<div class="li"><div class="main">Hlášení č. ' + r.cislo + ' · ' + ZPUSOB[r.zpusob] + '<div class="sub">' + dt(r.ts) + (r.duvod ? ' · ' + esc(r.duvod) : '') + '</div></div>' +
+        '<div class="row"><span class="' + (r.stav === 'prijato' ? 'good' : r.stav === 'zamitnuto' ? 'bad' : 'muted') + '" style="font-weight:600;font-size:.85rem">' + RSTAV[r.stav] + '</span><span class="amt">' + kc(r.castka) + '</span></div></div>';
+    }).join('') + '</div>';
+    return h + '</div></section>';
+  }
+  function wireMemberPay() {
+    var go2 = function (zp) {
+      var v = Math.round(+$('#payamt').value || 0); if (!(v > 0)) { fail(new Error('Zadej částku.')); return; }
+      api('requestPay', { castka: v, zpusob: zp }).then(function () { sfx('ok'); toast(zp === 'qr' ? 'Naskenuj QR v bance – správce dostal hlášení' : 'Správce dostal hlášení – předej mu peníze'); return load().then(renderMember); }).catch(fail);
+    };
+    var a = $('#rq_qr'), b = $('#rq_cash');
+    if (a) a.onclick = function () { a.disabled = true; go2('qr'); };
+    if (b) b.onclick = function () { b.disabled = true; go2('hotove'); };
+    app.querySelectorAll('[data-rqcancel]').forEach(function (x) {
+      x.onclick = function () {
+        if (!x.dataset.sure) { x.dataset.sure = '1'; x.textContent = 'Opravdu zrušit?'; x.classList.add('primary'); return; }
+        api('cancelPayReq', { id: x.dataset.rqcancel }).then(function () { sfx('undo'); toast('Hlášení zrušeno'); return load().then(renderMember); }).catch(fail);
+      };
+    });
+  }
+  function admPayments(el) {
+    var P = pendingReqs(), H = (ST.reqs || []).filter(function (r) { return r.stav !== 'ceka'; }).slice(0, 60);
+    el.innerHTML = '<section><h2 style="margin-bottom:10px">Čeká na potvrzení</h2>' + (P.length ? P.map(function (r) {
+      var x = EXP[r.id];
+      return '<div class="card reqadm"><div class="row" style="justify-content:space-between;align-items:flex-start"><div>' +
+        '<div class="eyebrow">Hlášení č. ' + r.cislo + ' · ' + dt(r.ts) + '</div><div style="font-weight:700;font-size:1.3rem;margin-top:2px">' + esc(r.jmeno) + '</div>' +
+        '<div class="muted" style="font-size:.9rem">' + (r.zpusob === 'qr' ? 'QR / převodem – v bance hledej <b>VS ' + esc(r.vs) + '</b>, zpráva „' + esc(ST.settings.klub) + ' ' + esc(r.jmeno) + ' c' + r.cislo + '“' : 'Hotově – převezmi peníze') + '</div></div>' +
+        '<div class="bal num" style="font-size:1.8rem">' + kc(r.castka) + '</div></div>' +
+        (x === 'no' ? '<div class="row" style="margin-top:10px"><div class="field" style="flex:1"><label for="rq_why">Důvod zamítnutí (uvidí ho člen)</label><input id="rq_why" type="text" placeholder="např. platba nedorazila"></div>' +
+          '<button class="btn primary" style="align-self:flex-end" data-rqno2="' + r.id + '">Zamítnout</button><button class="btn" style="align-self:flex-end" data-rqback="1">Zpět</button></div>'
+        : '<div class="row" style="margin-top:10px"><div class="field" style="width:130px"><label for="rq_c_' + r.id + '">Přijatá částka</label><input id="rq_c_' + r.id + '" type="number" inputmode="numeric" value="' + r.castka + '"></div>' +
+          '<button class="btn primary okbtn" style="align-self:flex-end" data-rqok="' + r.id + '">Přijmout platbu</button><button class="btn" style="align-self:flex-end" data-rqno="' + r.id + '">Zamítnout</button></div>') + '</div>';
+    }).join('') : '<div class="card muted">Nic nečeká. Až někdo nahlásí platbu, tady se objeví a tablet zabliká a cinkne.</div>') + '</section>' +
+      '<section class="sec"><h2 style="margin-bottom:10px">Vyřízená hlášení</h2><div class="card tablewrap"><table><thead><tr><th>Č.</th><th>Nahlášeno</th><th>Kdo</th><th>Způsob</th><th>Kč</th><th>Stav</th><th>Vyřízeno</th></tr></thead><tbody>' +
+      (H.length ? H.map(function (r) {
+        return '<tr><td class="num">' + r.cislo + '</td><td class="num">' + dt(r.ts) + '</td><td>' + esc(r.jmeno) + '</td><td>' + ZPUSOB[r.zpusob] + '</td><td class="num">' + kc(r.castka) + '</td>' +
+          '<td class="' + (r.stav === 'prijato' ? 'good' : r.stav === 'zamitnuto' ? 'bad' : 'muted') + '">' + RSTAV[r.stav] + (r.duvod ? ' <span class="muted">(' + esc(r.duvod) + ')</span>' : '') + '</td><td class="num muted">' + (r.vyrizeno ? dt(r.vyrizeno) : '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="7" class="muted">Zatím nic.</td></tr>') + '</tbody></table></div></section>';
+    el.querySelectorAll('[data-rqok]').forEach(function (b) {
+      b.onclick = function () {
+        var id = b.dataset.rqok, c = $('#rq_c_' + id).value; b.disabled = true;
+        api('resolvePayReq', { id: id, prijmout: true, castka: c }).then(function () { sfx('ok'); toast('Platba přijata'); EXP = {}; document.activeElement.blur(); return reAdm(); }).catch(function (e) { b.disabled = false; fail(e); });
+      };
+    });
+    el.querySelectorAll('[data-rqno]').forEach(function (b) { b.onclick = function () { EXP = {}; EXP[b.dataset.rqno] = 'no'; renderAdmin(); }; });
+    el.querySelectorAll('[data-rqback]').forEach(function (b) { b.onclick = function () { EXP = {}; renderAdmin(); }; });
+    el.querySelectorAll('[data-rqno2]').forEach(function (b) {
+      b.onclick = function () {
+        b.disabled = true;
+        api('resolvePayReq', { id: b.dataset.rqno2, prijmout: false, duvod: $('#rq_why').value }).then(function () { sfx('undo'); toast('Hlášení zamítnuto'); EXP = {}; document.activeElement.blur(); return reAdm(); }).catch(function (e) { b.disabled = false; fail(e); });
+      };
+    });
+  }
+
   /* ================= DOCHÁZKA (kdo je v Garage) ================= */
   var KDO = { member: 'mobil', tablet: 'tablet', admin: 'správce' };
   var JAK = { sam: 'odhlásil se', tablet: 'odhlášen na tabletu', admin: 'odhlásil správce', zavreno: 'zavřeno', automaticky: 'automaticky (2 h nic)' };
@@ -3416,11 +3566,7 @@ var CORE = (function () {
       '<div class="card">' + (Object.keys(tc.c).length ? '<div class="list">' + ST.items.filter(function (i) { return tc.c[i.id]; }).map(function (i) {
         return '<div class="li"><div class="main">' + esc(i.nazev) + '</div><div class="amt num">' + tc.c[i.id] + '×</div></div>';
       }).join('') + '</div>' : '<div class="muted">Dneska zatím nic.</div>') + '</div></section>' +
-      '<section class="sec"><h2>' + (debt ? 'Zaplatit dluh' : 'Dobít kredit') + '</h2><div class="card">' +
-      '<div class="row" style="margin-bottom:12px"><div class="field" style="flex:1"><label for="payamt">Částka</label>' +
-      '<input id="payamt" type="number" inputmode="numeric" min="1" step="1" value="' + (debt ? Math.ceil(debt) : 500) + '"></div></div>' +
-      '<div id="paybox">' + payBox(debt ? Math.ceil(debt) : 500, me.vs, ST.settings.klub + ' ' + me.jmeno) + '</div>' +
-      '<p class="muted" style="font-size:.85rem;margin:12px 0 0">Platbu převodem nebo hotově zapíše pokladník, pak se ti tu srovná zůstatek.</p></div></section>' +
+      memberPayHtml(me) +
       '<section class="sec"><h2>Historie</h2><div class="card"><div class="list">' + (hist.length ? hist.map(function (m) {
         var t = m.typ === 'platba' ? 'Platba ' + (m.pozn === 'qr' ? 'převodem' : 'hotově') : (m.ks > 1 ? m.ks + '× ' : '') + m.polozka;
         var a = m.typ === 'platba' ? '<span class="good">+' + kc(m.castka) + '</span>' : '−' + kc(m.castka);
@@ -3438,8 +3584,7 @@ var CORE = (function () {
     wirePresence(app, me.id); wireSnd();
     var fs = $('#fav_sel');
     if (fs) fs.onchange = function () { var v = fs.value; fs.blur(); api('setFav', { polozkaId: v }).then(function () { toast(v ? 'Hlavní tlačítko nastaveno' : 'Hlavní tlačítko podle toho, co piješ nejčastěji'); return load().then(renderMember); }).catch(fail); };
-    var inp = $('#payamt');
-    inp.oninput = function () { var v = +inp.value; if (v > 0) $('#paybox').innerHTML = payBox(v, me.vs, ST.settings.klub + ' ' + me.jmeno); };
+    wireMemberPay();
   }
   function undoMove(id, extra) {
     var qi = -1; Q.forEach(function (q, i) { if (q.p.qid === id) qi = i; });
@@ -3461,7 +3606,7 @@ var CORE = (function () {
     var tday = ST.members.reduce(function (t, m) { return t + m.dnesKc; }, 0);
     app.innerHTML = '<div class="wrap"><div class="top"><div><div class="eyebrow">Pokladna</div><h1>' + esc(s.klub) + '</h1></div>' +
       '<div class="row"><span class="clock num" id="clock"></span>' + sndBtn() + '<button class="btn ghost small" id="toAdmin">Správce</button></div></div>' +
-      presenceCard('tablet') +
+      reqBanner('tablet') + presenceCard('tablet') +
       '<div class="stats"><div><div class="eyebrow">Dnes vypito ' + dayInfo() + '</div><div class="bal num">' + kc(tday) + '</div></div>' +
       '<div><div class="eyebrow">Dluhy celkem</div><div class="bal num bad">' + kc(debts) + '</div></div></div>' +
       (low.length ? '<div class="lowbar"><span class="eyebrow" style="align-self:center">Dochází:</span>' + low.map(function (z) { return '<span class="chip">' + esc(z.nazev) + ' · ' + fmtQ(z.stav, z.jednotka) + '</span>'; }).join('') + '</div>' : '') +
@@ -3475,7 +3620,7 @@ var CORE = (function () {
     tickClock();
     app.querySelectorAll('[data-m]').forEach(function (b) { b.onclick = function () { openMember(b.dataset.m); }; });
     $('#toAdmin').onclick = function () { go({ admin: true, t: ROUTE.t }); };
-    wirePresence(app); wireSnd();
+    wirePresence(app); wireSnd(); wireReqBanner('tablet'); reqAlert();
     if (OPEN) renderSheet();
   }
   function tickClock() { var c = $('#clock'); if (c) c.textContent = new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }); }
@@ -3524,12 +3669,19 @@ var CORE = (function () {
       '<div style="text-align:right"><div class="eyebrow">Dnes ' + dayInfo() + '</div><div class="bal num" style="font-size:1.4rem">' + kc(tc.sum) + '</div></div></div>' +
       tilesHtml(ST.items, tc.c, m.hlavni) +
       (host && owe ? '<section class="sec"><h2>Host platí</h2><div class="card">' + payBox(owe, '', ST.settings.klub + ' host') +
-        '<p class="muted" style="font-size:.85rem;margin:12px 0 0">Platbu zapíše správce.</p></div></section>' : '') +
+        '<div class="row" style="margin-top:12px"><button class="btn primary" data-hostrq="qr">Host zaplatil QR</button><button class="btn" data-hostrq="hotove">Host zaplatil hotově</button></div>' +
+        '<p class="muted" style="font-size:.85rem;margin:8px 0 0">Správce dostane hlášení a platbu potvrdí.</p></div></section>' : '') +
       '<section class="sec"><h2>Dnešní zápisy</h2><div class="card"><div class="list">' + (mine.length ? mine.map(function (x) {
         return '<div class="li' + (x.storno ? ' storno' : '') + '"><div class="main">' + esc(x.polozka) + '<div class="sub">' + tm(x.ts) + '</div></div><div class="row">' + (x.storno ? '<span class="stlab">' + stornoLab(x) + '</span>' : '') + pendLab(x) + '<span class="amt">' + kc(x.castka) + '</span>' +
           (canUndo(x) ? '<button class="btn small" data-undo="' + esc(x.id) + '">Zpět</button>' : '') + '</div></div>';
       }).join('') : '<div class="muted">Dneska zatím nic.</div>') + '</div></div></section></div>';
     $('#close').onclick = closeSheet;
+    sheet.querySelectorAll('[data-hostrq]').forEach(function (b) {
+      b.onclick = function () {
+        b.disabled = true;
+        api('requestPay', { clenId: m.id, castka: owe, zpusob: b.dataset.hostrq }).then(function () { sfx('ok'); toast('Hlášení platby odesláno správci'); closeSheet(); return load().then(renderTablet); }).catch(function (e) { b.disabled = false; fail(e); });
+      };
+    });
     var si = $('#sh_in'), so = $('#sh_out');
     if (si) si.onclick = function () { si.disabled = true; presAct('checkin', { clenId: m.id }, m.jmeno + ' je v Garage'); };
     if (so) so.onclick = function () { so.disabled = true; presAct('checkout', { clenId: m.id }, m.jmeno + ' odhlášen'); };
@@ -3550,7 +3702,7 @@ var CORE = (function () {
       '<form id="lf" class="card" style="display:flex;flex-direction:column;gap:12px"><div class="field"><label for="apin">PIN správce</label>' +
       '<input id="apin" type="password" inputmode="numeric" autocomplete="off"></div>' + (errMsg ? '<div class="bad">' + esc(errMsg) + '</div>' : '') +
       '<button class="btn primary" type="submit">Přihlásit</button>' + (DEMO ? '<div class="muted">V demu je PIN 1234.</div>' : '') + '</form></div>';
-    var b = $('#back'); if (b) b.onclick = function () { go({ t: ROUTE.t }); };
+    var b = $('#back'); if (b) b.onclick = function () { adminLogout(); go({ t: ROUTE.t }); };
     $('#apin').focus();
     $('#lf').onsubmit = function (e) {
       e.preventDefault();
@@ -3561,17 +3713,33 @@ var CORE = (function () {
   function renderAdmin() {
     if (PEND && TAB === 'pohyby' && arguments[0] === 'poll') return; // nepřekreslovat během potvrzování storna
     var focusId = document.activeElement && document.activeElement.id;
-    if (focusId && /^(f_|n_|i_|s_|pay_|mf_|z_|add_|vf_|sr_|fav_)/.test(focusId)) return; // nepřepisovat rozepsaný formulář při obnově
-    var tabs = [['clenove', 'Členové'], ['navstevy', 'Docházka'], ['sklad', 'Sklad'], ['polozky', 'Položky'], ['pohyby', 'Pohyby'], ['nastaveni', 'Nastavení']];
+    if (focusId && /^(f_|n_|i_|s_|pay_|mf_|z_|add_|vf_|sr_|fav_|rq_)/.test(focusId)) return; // nepřepisovat rozepsaný formulář při obnově
+    var np = pendingReqs().length;
+    var tabs = [['clenove', 'Členové'], ['platby', 'Platby' + (np ? ' <span class="tabbadge">' + np + '</span>' : '')], ['navstevy', 'Docházka'], ['sklad', 'Sklad'], ['polozky', 'Položky'], ['pohyby', 'Pohyby'], ['nastaveni', 'Nastavení']];
     app.innerHTML = '<div class="wrap"><div class="top"><div><div class="eyebrow">Správce</div><h1>' + esc(ST.settings.klub) + '</h1></div>' +
       '<div class="row">' + (ROUTE.fromTablet ? '<button class="btn ghost small" id="back">Zpět na tablet</button>' : '') + '<button class="btn ghost small" id="logout">Odhlásit</button></div></div>' +
       '<div class="tabs">' + tabs.map(function (t) { return '<button class="tab' + (TAB === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
-      '<div id="tabbody"></div></div>';
+      (TAB !== 'platby' ? reqBanner('admin') : '') + '<div id="tabbody"></div></div>';
+    wireReqBanner('admin'); reqAlert();
     app.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { TAB = b.dataset.tab; EXP = {}; PEND = null; renderAdmin(); }; });
-    var b = $('#back'); if (b) b.onclick = function () { go({ t: ROUTE.t }); };
-    $('#logout').onclick = function () { ss('pk_admin', null); AUTH = null; renderAdminLogin(); };
-    ({ clenove: admMembers, navstevy: admVisits, sklad: admStock, polozky: admItems, pohyby: admMoves, nastaveni: admSettings })[TAB]($('#tabbody'));
+    var b = $('#back'); if (b) b.onclick = function () { adminLogout(); go({ t: ROUTE.t }); };
+    $('#logout').onclick = function () { adminLogout(); AUTH = null; toast('Správce odhlášen'); if (ROUTE.fromTablet) go({ t: ROUTE.t }); else renderAdminLogin(); };
+    admIdle();
+    ({ clenove: admMembers, platby: admPayments, navstevy: admVisits, sklad: admStock, polozky: admItems, pohyby: admMoves, nastaveni: admSettings })[TAB]($('#tabbody'));
   }
+  // odhlášení správce: tlačítko Odhlásit, Zpět na tablet, a samo po 5 minutách bez dotyku
+  function adminLogout() { ss('pk_admin', null); clearTimeout(ADM_IDLE); }
+  var ADM_IDLE = null;
+  function admIdle() {
+    clearTimeout(ADM_IDLE);
+    if (!AUTH || AUTH.admin == null) return;
+    ADM_IDLE = setTimeout(function () {
+      if (!AUTH || AUTH.admin == null) return;
+      adminLogout(); toast('Správce odhlášen po 5 minutách nečinnosti');
+      if (ROUTE.fromTablet) go({ t: ROUTE.t }); else { AUTH = null; renderAdminLogin(); }
+    }, 5 * 60 * 1000);
+  }
+  ['pointerdown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { if (AUTH && AUTH.admin != null) admIdle(); }, { capture: true, passive: true }); });
   function adminPoll() { renderAdmin('poll'); }
   function reAdm() { return load().then(renderAdmin); }
   // v demu vede QR na zkušební stránku v Claude s #kódem člena (query string se tam nepředává); po nasazení klasicky ?m=
@@ -4033,12 +4201,13 @@ var CORE = (function () {
   /* ================= ROUTER ================= */
   function go(r) {
     closeSheet(); clearInterval(POLL); ROUTE = r; window.scrollTo(0, 0);
+    if (!r.admin) adminLogout(); // odchod ze Správce kamkoli jinam = odhlášení
     if (DEMO) renderDemoBar();
     if (r.m) {
       AUTH = { token: r.m }; renderCurrent = renderMember; qLoad();
       loadOrCache().then(function () { renderMember(); poll(30000, renderMember); }, landingErr);
     } else if (r.admin) {
-      r.fromTablet = !!r.t;
+      r.fromTablet = !!r.t; if (r.tab) TAB = r.tab;
       var saved = ss('pk_admin'); renderCurrent = renderAdmin; Q = []; netBar();
       if (saved) { AUTH = { admin: saved }; load().then(function () { renderAdmin(); poll(PS.on ? 10000 : 30000, adminPoll); }, function () { ss('pk_admin', null); renderAdminLogin(); }); }
       else renderAdminLogin();
